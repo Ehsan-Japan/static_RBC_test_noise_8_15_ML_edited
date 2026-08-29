@@ -59,3 +59,11 @@ Thumbs.db
 
 # --- Personal Claude notes ---
 CLAUDE.local.md
+
+# --- Conference / paper figure bundles (not for GitHub) ---
+SSDM_deck/
+paper_figures/*.png
+paper_figures/*.jpg
+paper_figures/*.svg
+illustrator/*.png
+illustrator/*.svg
