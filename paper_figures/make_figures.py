@@ -459,6 +459,50 @@ def fig_panels(device_index=RESULT_DEVICE):
           colour="#7d2b3a", cbar=True)
 
 
+# ── figure 6: the charge sensor, raw and with its background removed ──────
+# The raw sensor signal is a large smooth gradient with the transition lines
+# riding on it as a small modulation — which is why the raw map looks like a
+# featureless wash.  Showing both is the honest way to present it, and it is
+# also the reason the whole problem is hard.
+def fig_charge_sensor(device=None):
+    from scipy.ndimage import gaussian_filter
+
+    device = device or os.path.join(POOL, "sample_10")   # = test/sample_2
+    ux, uy, Z = ray_peaks.load_grid(device)
+    gy, gx = np.gradient(Z)
+    g = gx + gy
+    detail = g - gaussian_filter(g, 3.0)                 # high-pass
+    lim = np.percentile(np.abs(detail), 99.0)
+
+    ext = [ux.min(), ux.max(), uy.min(), uy.max()]
+    fig, axes = plt.subplots(1, 2, figsize=(8.6, 4.1))
+
+    ax = axes[0]
+    im = ax.imshow(Z, origin="lower", cmap="inferno", extent=ext,
+                   aspect="auto", interpolation="nearest")
+    ax.set_title("as measured\na large smooth background", fontsize=11)
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03).ax.tick_params(
+        labelsize=8)
+
+    ax = axes[1]
+    im = ax.imshow(detail, origin="lower", cmap="RdBu_r", vmin=-lim, vmax=lim,
+                   extent=ext, aspect="auto", interpolation="nearest")
+    ax.set_title("same data, slow background removed\nthe transition "
+                 "lines appear", fontsize=11)
+    fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03).ax.tick_params(
+        labelsize=8)
+
+    for ax in axes:
+        ax.set_xlabel("$V_1$ (mV)", fontsize=9.5)
+        ax.tick_params(labelsize=8)
+        for sp in ax.spines.values():
+            sp.set_color("#999999")
+    axes[0].set_ylabel("$V_2$ (mV)", fontsize=9.5)
+
+    fig.tight_layout()
+    save(fig, "panel_charge_sensor")
+
+
 if __name__ == "__main__":
     print("figures ->", HERE)
     fig_network_input()
@@ -467,3 +511,4 @@ if __name__ == "__main__":
     fig_probability_to_lines(RESULT_DEVICE)
     fig_model_flow()
     fig_panels()
+    fig_charge_sensor()
