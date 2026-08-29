@@ -59,6 +59,15 @@ are the stages. `benchmark.py` is the geometry ablation.
   gates coupled through C_m; QD_s is the charge sensor. Capacitances sampled
   randomly per device. Ground truth is the exact charge-state boundary from
   the simulator, not an edge-detected image.
+- **The voltage window is NOT [−1, 1].** `device_factory.generate` takes a
+  *base* window of (−1, 1, −1, 1) and then shifts it per device by
+  `offset_scale = 0.35` of the width, i.e. `off ~ U(−0.7, +0.7)` on each
+  axis. Every device therefore spans exactly **2 × 2**, but its origin
+  varies: across the 550-device pool `x_min` runs −1.695 … −0.301 and
+  `y_min` −1.700 … −0.307. The per-device window is stored in each
+  `sample_N/device.json` under `voltage_window`. Axes are labelled **mV**
+  (`set_axis_labels(..., x_unit="mV", y_unit="mV")`). Say "a 2 × 2 mV window,
+  randomly offset per device" — never "[−1, 1]".
   **Noise-free**: `NoNoise()` in `dqd_simulator.py`, nothing added afterwards.
 - **Measurement** — n rays × n points fired from one corner of the window.
   A ray crossing a transition line gives a local maximum in the sensor
@@ -135,8 +144,8 @@ to be defined, chosen out-of-sample and reported.
 ## Limitations to state, not bury
 
 Simulation only and noise-free; constant-capacitance model, double dot,
-fixed 100×100 window and fixed ray origin; rays are non-adaptive; strict IoU
-is low.
+fixed 100×100 resolution and a fixed 2 × 2 window size (only its origin
+varies); fixed ray origin; rays are non-adaptive; strict IoU is low.
 
 ## Conventions
 
