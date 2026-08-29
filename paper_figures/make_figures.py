@@ -112,6 +112,9 @@ DEC = "#c07a4a"
 IO = "#5f8a5f"
 
 
+_BLOCK_FS = 1.0          # set by draw_unet so sub-captions scale with fs
+
+
 def _block(ax, x, y, w, h, color, label, sub=None):
     ax.add_patch(FancyBboxPatch((x, y), w, h,
                                 boxstyle="round,pad=0.012,rounding_size=0.03",
@@ -120,7 +123,7 @@ def _block(ax, x, y, w, h, color, label, sub=None):
             fontsize=11, color="white", fontweight="bold", zorder=3)
     if sub:
         ax.text(x + w / 2, y - 0.055, sub, ha="center", va="top",
-                fontsize=8.5, color=MUT)
+                fontsize=8.5 * _BLOCK_FS, color=MUT)
 
 
 def _arrow(ax, p, q, color, style="-", lw=1.6):
@@ -129,8 +132,12 @@ def _arrow(ax, p, q, color, style="-", lw=1.6):
                                  shrinkA=1, shrinkB=1, zorder=1))
 
 
-def fig_unet():
-    fig, ax = plt.subplots(figsize=(9.0, 3.0))
+def draw_unet(ax, fs=1.0, io_labels=True):
+    """Draw the U-Net schematic into an existing axes.  fs scales the fonts;
+    io_labels=False drops the input/output captions, for when the figure
+    already shows the real input and output either side."""
+    global _BLOCK_FS
+    _BLOCK_FS = fs
     ax.set_xlim(0, 10); ax.set_ylim(-0.32, 1.25); ax.axis("off")
 
     # x, y, w, h, colour, label, caption
@@ -173,19 +180,26 @@ def fig_unet():
                (dec_x[2 - i], skip_y[i]), "#9aa2ac", style=(0, (4, 3)),
                lw=1.2)
     ax.text(4.66, lvl[0][1] + 0.02, "skip connections",
-            ha="center", fontsize=8.5, color=MUT, style="italic")
+            ha="center", fontsize=8.5 * fs, color=MUT, style="italic")
 
-    ax.text(0.42, 0.16, "channel 1  ray signal\nchannel 2  visited mask",
-            ha="center", va="top", fontsize=8.5, color=MUT)
-    ax.text(8.68, 0.16, "P(transition line)\nper pixel",
-            ha="center", va="top", fontsize=8.5, color=MUT)
-    ax.text(2.43, 1.16, "encoder", fontsize=10.5, color=ENC,
+    if io_labels:
+        ax.text(0.42, 0.16, "channel 1  ray signal\nchannel 2  visited mask",
+                ha="center", va="top", fontsize=8.5 * fs, color=MUT)
+        ax.text(8.68, 0.16, "P(transition line)\nper pixel",
+                ha="center", va="top", fontsize=8.5 * fs, color=MUT)
+    ax.text(2.43, 1.16, "encoder", fontsize=10.5 * fs, color=ENC,
             fontweight="bold", ha="center")
-    ax.text(6.38, 1.16, "decoder", fontsize=10.5, color=DEC,
+    ax.text(6.38, 1.16, "decoder", fontsize=10.5 * fs, color=DEC,
             fontweight="bold", ha="center")
-    ax.text(4.66, -0.14, "bottleneck", fontsize=9.5, color=BOT,
+    ax.text(4.66, -0.14, "bottleneck", fontsize=9.5 * fs, color=BOT,
             fontweight="bold", ha="center", va="top")
 
+    return ax
+
+
+def fig_unet():
+    fig, ax = plt.subplots(figsize=(9.0, 3.0))
+    draw_unet(ax)
     save(fig, "fig_unet")
 
 
@@ -317,9 +331,82 @@ def fig_probability_to_lines(device_index=None, ladder=LADDER):
     save(fig, "fig_probability_to_lines")
 
 
+# ── figure 4: the whole flow — input | network | output ───────────────────
+def fig_model_flow(device_index=RESULT_DEVICE):
+    """
+    The two input maps on the left, the network in the middle, the
+    probability map on the right — one picture of what the model does.
+    """
+    from dqd.ml import grid_train
+    from dqd.study.dataset import load_split
+
+    cfg_dir = os.path.join(RUN_DIR, CONFIG)
+    X, Y, names = load_split(os.path.join(cfg_dir, "test.npz"))
+    net, ck = grid_train.load(os.path.join(cfg_dir, "model", "unet.pt"))
+    i = device_index
+    p = grid_train.predict(net, X[i:i + 1])[0]
+    sig, vis = X[i][0], X[i][1]
+
+    fig = plt.figure(figsize=(13.0, 3.5))
+    gs = fig.add_gridspec(2, 3, width_ratios=[1.0, 3.45, 1.25],
+                          wspace=0.30, hspace=0.42,
+                          left=0.02, right=0.985, top=0.86, bottom=0.06)
+
+    def blank(ax):
+        ax.set_xticks([]); ax.set_yticks([])
+        for sp in ax.spines.values():
+            sp.set_color("#999999")
+
+    cm = plt.get_cmap("inferno").copy(); cm.set_bad("#f2f2f2")
+    ax1 = fig.add_subplot(gs[0, 0])
+    ax1.imshow(np.where(vis > 0.5, sig, np.nan), origin="lower", cmap=cm,
+               vmin=0, vmax=1, interpolation="nearest")
+    ax1.set_title("channel 1 · measured signal", fontsize=9.5, pad=5)
+    blank(ax1)
+
+    ax2 = fig.add_subplot(gs[1, 0])
+    ax2.imshow(1.0 - vis, origin="lower", cmap="gray", vmin=0, vmax=1,
+               interpolation="nearest")
+    ax2.set_title(f"channel 2 · visited mask ({100 * vis.mean():.1f} %)",
+                  fontsize=9.5, pad=5)
+    blank(ax2)
+
+    axn = fig.add_subplot(gs[:, 1])
+    draw_unet(axn, fs=0.92, io_labels=False)
+
+    axo = fig.add_subplot(gs[:, 2])
+    im = axo.imshow(p, origin="lower", cmap="magma", vmin=0, vmax=1,
+                    interpolation="nearest")
+    axo.set_title("P(transition line) per pixel", fontsize=10.5,
+                  color="#7d2b3a", pad=6)
+    fig.colorbar(im, ax=axo, fraction=0.046, pad=0.03).ax.tick_params(
+        labelsize=7.5)
+    blank(axo)
+
+    # arrows in figure coordinates: inputs -> network -> output
+    def farrow(x0, y0, x1, y1):
+        fig.add_artist(FancyArrowPatch((x0, y0), (x1, y1),
+                                       transform=fig.transFigure,
+                                       arrowstyle="-|>", mutation_scale=15,
+                                       linewidth=1.8, color="#444444"))
+    b1, b2 = ax1.get_position(), ax2.get_position()
+    bn, bo = axn.get_position(), axo.get_position()
+    farrow(b1.x1 + 0.004, b1.y0 + b1.height * 0.5,
+           bn.x0 + 0.012, bn.y0 + bn.height * 0.62)
+    farrow(b2.x1 + 0.004, b2.y0 + b2.height * 0.5,
+           bn.x0 + 0.012, bn.y0 + bn.height * 0.62)
+    farrow(bn.x1 - 0.010, bn.y0 + bn.height * 0.62,
+           bo.x0 - 0.006, bo.y0 + bo.height * 0.5)
+
+    fig.text(0.5, 0.955, "Two measured maps in, one probability map out",
+             ha="center", fontsize=12.5, color=INK)
+    save(fig, "fig_model_flow")
+
+
 if __name__ == "__main__":
     print("figures ->", HERE)
     fig_network_input()
     fig_network_input(compact=True)
     fig_unet()
     fig_probability_to_lines(RESULT_DEVICE)
+    fig_model_flow()
