@@ -403,6 +403,48 @@ def fig_model_flow(device_index=RESULT_DEVICE):
     save(fig, "fig_model_flow")
 
 
+# ── figure 5: the same three maps, each as its own standalone panel ───────
+# Separate files so a slide can lay them out itself, with its own arrows,
+# instead of being handed one merged image.
+def fig_panels(device_index=RESULT_DEVICE):
+    from dqd.ml import grid_train
+    from dqd.study.dataset import load_split
+
+    cfg_dir = os.path.join(RUN_DIR, CONFIG)
+    X, Y, names = load_split(os.path.join(cfg_dir, "test.npz"))
+    net, ck = grid_train.load(os.path.join(cfg_dir, "model", "unet.pt"))
+    i = device_index
+    prob = grid_train.predict(net, X[i:i + 1])[0]
+    sig, vis = X[i][0], X[i][1]
+
+    def panel(draw, title, name, colour=INK, cbar=None):
+        fig, ax = plt.subplots(figsize=(2.7, 2.95))
+        im = draw(ax)
+        ax.set_title(title, fontsize=11, color=colour, pad=7)
+        ax.set_xticks([]); ax.set_yticks([])
+        for sp in ax.spines.values():
+            sp.set_color("#999999")
+        if cbar:
+            cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
+            cb.ax.tick_params(labelsize=7.5)
+        fig.tight_layout()
+        save(fig, name)
+
+    cm = plt.get_cmap("inferno").copy(); cm.set_bad("#f2f2f2")
+    panel(lambda ax: ax.imshow(np.where(vis > 0.5, sig, np.nan),
+                               origin="lower", cmap=cm, vmin=0, vmax=1,
+                               interpolation="nearest"),
+          "channel 1\nmeasured sensor signal", "panel_channel1")
+    panel(lambda ax: ax.imshow(1.0 - vis, origin="lower", cmap="gray",
+                               vmin=0, vmax=1, interpolation="nearest"),
+          f"channel 2\nvisited mask ({100 * vis.mean():.1f} % of the grid)",
+          "panel_channel2")
+    panel(lambda ax: ax.imshow(prob, origin="lower", cmap="magma", vmin=0,
+                               vmax=1, interpolation="nearest"),
+          "output\nP(transition line) per pixel", "panel_probability",
+          colour="#7d2b3a", cbar=True)
+
+
 if __name__ == "__main__":
     print("figures ->", HERE)
     fig_network_input()
@@ -410,3 +452,4 @@ if __name__ == "__main__":
     fig_unet()
     fig_probability_to_lines(RESULT_DEVICE)
     fig_model_flow()
+    fig_panels()
