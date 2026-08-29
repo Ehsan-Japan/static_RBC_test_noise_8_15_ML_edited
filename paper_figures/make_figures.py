@@ -218,7 +218,7 @@ def fig_unet():
 CONFIG = "8_rays_60_points_500_samples"
 RUN_DIR = os.path.join(ROOT, "results",
                        "4-5-6-7-8_rays_40-50-60_points_500_samples")
-LADDER = (0.2, 0.4, 0.6, 0.9)
+LADDER = (0.2, 0.4, 0.9)
 
 # Which held-out device the results figure uses.  Index into test.npz:
 #   0 -> figures/test/sample_1 (pool sample_5)
@@ -276,11 +276,11 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
 
     TAUS = (0, 1, 2, 3)
     d_true_by_tau = {}
-    fig = plt.figure(figsize=(15.6, 6.3))
-    # row 1: six panels (2 cols each); row 2: four panels (3 cols each)
-    gs = fig.add_gridspec(2, 12, height_ratios=[1.0, 1.0],
-                          hspace=0.78, wspace=0.30,
-                          left=0.03, right=0.985, top=0.83, bottom=0.11)
+    fig = plt.figure(figsize=(13.6, 7.2))
+    # four panels per row, so each is half again as large as before
+    gs = fig.add_gridspec(2, 4, height_ratios=[1.0, 1.0],
+                          hspace=0.42, wspace=0.16,
+                          left=0.035, right=0.99, top=0.86, bottom=0.09)
 
     def blank(ax):
         ax.set_xticks([]); ax.set_yticks([])
@@ -303,31 +303,24 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
         return rgb
 
     # ── row 1: the output, the truth, and the map cut four ways ──────────
-    ax = fig.add_subplot(gs[0, 0:2])
+    ax = fig.add_subplot(gs[0, 0])
     im = ax.imshow(p, origin="lower", cmap="magma", vmin=0, vmax=1,
                    interpolation="nearest")
-    ax.set_title("U-Net output\nP(transition line)", fontsize=10,
+    ax.set_title("U-Net output\nP(transition line)", fontsize=11.5,
                  color="#7d2b3a")
     fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03).ax.tick_params(
         labelsize=6.5)
     blank(ax)
 
-    ax = fig.add_subplot(gs[0, 2:4])
-    ax.imshow(1 - truth, origin="lower", cmap="gray",
-              interpolation="nearest")
-    ax.set_title(f"ground truth\n{100 * truth.mean():.1f} % line pixels",
-                 fontsize=10)
-    blank(ax)
-
     for k, t in enumerate(ladder):
         pred = p > t
         m = tolerant_f1(pred, Yt, 1.0)
-        ax = fig.add_subplot(gs[0, 4 + 2 * k:6 + 2 * k])
+        ax = fig.add_subplot(gs[0, 1 + k])
         ax.imshow(err_rgb(pred, 1.0), origin="lower",
                   interpolation="nearest")
         chosen = abs(t - thr) < 1e-9
         ax.set_title(f"P > {t:g}" + ("  (chosen)" if chosen else "") +
-                     f"\nF1@1 {m['f1']:.3f}", fontsize=10,
+                     f"\nF1@1 {m['f1']:.3f}", fontsize=11.5,
                      color="#c0392b" if chosen else INK,
                      fontweight="bold" if chosen else "normal")
         blank(ax)
@@ -339,12 +332,12 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
     pred = p > thr
     for k, tau in enumerate(TAUS):
         m = tolerant_f1(pred, Yt, float(tau))
-        ax = fig.add_subplot(gs[1, 2 + 2 * k:4 + 2 * k])
+        ax = fig.add_subplot(gs[1, k])
         ax.imshow(err_rgb(pred, float(tau)), origin="lower",
                   interpolation="nearest")
         head = {0: "τ = 0   strict", 1: "τ = 1   headline"}.get(
             tau, f"τ = {tau}")
-        ax.set_title(f"{head}\nF1@{tau} {m['f1']:.3f}", fontsize=10,
+        ax.set_title(f"{head}\nF1@{tau} {m['f1']:.3f}", fontsize=11.5,
                      color="#1f5fa8" if tau == 1 else INK,
                      fontweight="bold" if tau == 1 else "normal")
         blank(ax)
@@ -352,9 +345,9 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
             for sp in ax.spines.values():
                 sp.set_color("#1f5fa8"); sp.set_linewidth(2.2)
 
-    fig.text(0.5, 0.965, "cutting the probability map at four thresholds",
+    fig.text(0.5, 0.975, "cutting the probability map at three thresholds",
              ha="center", fontsize=10.5, color=MUT)
-    fig.text(0.5, 0.505, "the SAME prediction (P > "
+    fig.text(0.5, 0.478, "the SAME prediction (P > "
              f"{thr:g}), scored at four tolerances τ — a predicted pixel "
              "counts as correct when a true line lies within τ pixels",
              ha="center", fontsize=10.5, color=MUT)
