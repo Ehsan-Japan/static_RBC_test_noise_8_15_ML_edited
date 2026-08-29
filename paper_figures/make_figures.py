@@ -21,17 +21,23 @@ from matplotlib.patches import FancyBboxPatch, FancyArrowPatch
 
 sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)),
                                 "..", "src"))
-from dqd.ml import ray_peaks                                   # noqa: E402
+from dqd.ml import ray_peaks, grid_train                       # noqa: E402
 
 HERE = os.path.dirname(os.path.abspath(__file__))
 ROOT = os.path.abspath(os.path.join(HERE, ".."))
 POOL = os.path.join(ROOT, "training_data", "_device_pools",
                     "devices_n550_res100_c1df7b6bf")
 
-# The device used for the INPUT / MASK explanation.  pool sample_1 is a
-# TRAINING device (device_id 0) — fine here, because this figure only shows
-# what a measurement looks like and makes no accuracy claim.
-DEVICE = os.path.join(POOL, "sample_1")
+# Every figure in the deck shows ONE device: #33 from the charge-sensor
+# gallery, simulated in its 0.8 mV window.  It is a freshly generated device
+# — not in the 550-device pool at all — so the network has never seen it.
+# NOTE: the network was trained on 2 mV windows.  At 0.8 mV the honeycomb is
+# coarser than anything it was fitted on, so the reconstruction here scores
+# below the test-set mean.  See picked_device_33/scores.csv.
+PICK = os.path.join(ROOT, "results",
+                    "4-5-6-7-8_rays_40-50-60_points_500_samples",
+                    "picked_device_33", "device_0.8mV")
+DEVICE = PICK
 N_RAYS, N_POINTS = 8, 60
 
 INK = "#111111"
@@ -221,6 +227,16 @@ LADDER = (0.2, 0.4, 0.6, 0.9)
 RESULT_DEVICE = 1
 
 
+def pick_case(net, n_rays=8, n_points=60):
+    """(channels, truth, probability) for the picked device."""
+    m = ray_peaks.measure(PICK, n_rays, n_points)
+    ux, uy, Z = ray_peaks.load_grid(PICK)
+    ch = ray_peaks.to_channels(m, Z.shape)
+    truth = ray_peaks.load_ground_truth(PICK)
+    prob = grid_train.predict(net, ch[None, :ray_peaks.NET_CHANNELS])[0]
+    return ch, truth, prob
+
+
 def _validation_curve(net, cfg_dir):
     """
     Re-derive the exact validation split the training used and score every
@@ -250,14 +266,13 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
     from scipy.ndimage import distance_transform_edt
 
     cfg_dir = os.path.join(RUN_DIR, CONFIG)
-    X, Y, names = load_split(os.path.join(cfg_dir, "test.npz"))
     net, ck = grid_train.load(os.path.join(cfg_dir, "model", "unet.pt"))
     thr = float(ck["threshold"])
-    i = device_index
-    p = grid_train.predict(net, X[i:i + 1])[0]
-    truth = Y[i] > 0.5
-    print(f"  figures/test/sample_{i + 1} = {os.path.basename(names[i])}   "
-          f"threshold {thr:g}")
+    ch, Yt, p = pick_case(net)
+    Y = {0: Yt}                      # keep the indexing below unchanged
+    i = 0
+    truth = Yt > 0.5
+    print(f"  picked device #33 (0.8 mV window)   threshold {thr:g}")
 
     cand, vf1, n_val = _validation_curve(net, cfg_dir)
     best = cand[int(np.argmax(vf1))]
@@ -335,7 +350,7 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
                 sp.set_color("#c0392b"); sp.set_linewidth(2.4)
 
     fig.text(0.5, 0.435, "the same probability map, cut at four thresholds "
-                         "on a HELD-OUT device", ha="center", fontsize=10,
+                         "on an unseen device (0.8 mV window)", ha="center", fontsize=10,
              color=MUT)
     fig.text(0.5, 0.012,
              "green = line found within 1 px      "
@@ -355,11 +370,9 @@ def fig_model_flow(device_index=RESULT_DEVICE):
     from dqd.study.dataset import load_split
 
     cfg_dir = os.path.join(RUN_DIR, CONFIG)
-    X, Y, names = load_split(os.path.join(cfg_dir, "test.npz"))
     net, ck = grid_train.load(os.path.join(cfg_dir, "model", "unet.pt"))
-    i = device_index
-    p = grid_train.predict(net, X[i:i + 1])[0]
-    sig, vis = X[i][0], X[i][1]
+    ch, _, p = pick_case(net)
+    sig, vis = ch[ray_peaks.CH_SIGNAL], ch[ray_peaks.CH_VISITED]
 
     fig = plt.figure(figsize=(13.0, 3.5))
     gs = fig.add_gridspec(2, 3, width_ratios=[1.0, 3.45, 1.25],
@@ -425,11 +438,9 @@ def fig_panels(device_index=RESULT_DEVICE):
     from dqd.study.dataset import load_split
 
     cfg_dir = os.path.join(RUN_DIR, CONFIG)
-    X, Y, names = load_split(os.path.join(cfg_dir, "test.npz"))
     net, ck = grid_train.load(os.path.join(cfg_dir, "model", "unet.pt"))
-    i = device_index
-    prob = grid_train.predict(net, X[i:i + 1])[0]
-    sig, vis = X[i][0], X[i][1]
+    ch, _, prob = pick_case(net)
+    sig, vis = ch[ray_peaks.CH_SIGNAL], ch[ray_peaks.CH_VISITED]
 
     def panel(draw, title, name, colour=INK, cbar=None):
         fig, ax = plt.subplots(figsize=(2.7, 2.95))
@@ -503,6 +514,54 @@ def fig_charge_sensor(device=None):
     save(fig, "panel_charge_sensor")
 
 
+# ── figure 7: the measurement story for the picked device ────────────────
+def fig_measurement_panel(n_rays=8, n_points=60):
+    """charge sensor | ground truth | rays and peaks | what the net is shown"""
+    ux, uy, Z = ray_peaks.load_grid(PICK)
+    m = ray_peaks.measure(PICK, n_rays, n_points)
+    ch = ray_peaks.to_channels(m, Z.shape)
+    truth = ray_peaks.load_ground_truth(PICK) > 0.5
+    ext = [ux.min(), ux.max(), uy.min(), uy.max()]
+    sx = (ux.max() - ux.min()) / (len(ux) - 1)
+    sy = (uy.max() - uy.min()) / (len(uy) - 1)
+
+    fig, axes = plt.subplots(1, 4, figsize=(14.0, 3.6))
+
+    axes[0].imshow(Z, origin="lower", cmap="hot", extent=ext, aspect="auto",
+                   interpolation="nearest")
+    axes[0].set_title("charge sensor", fontsize=11)
+
+    axes[1].imshow(1 - truth, origin="lower", cmap="gray", extent=ext,
+                   aspect="auto", interpolation="nearest")
+    axes[1].set_title("stability diagram\n(ground truth)", fontsize=11)
+
+    axes[2].imshow(1 - truth, origin="lower", cmap="gray", extent=ext,
+                   aspect="auto", interpolation="nearest")
+    vy, vx = np.nonzero(ch[ray_peaks.CH_VISITED] > 0.5)
+    py, px = np.nonzero(ch[ray_peaks.CH_PEAKS] > 0.5)
+    axes[2].plot(ux.min() + vx * sx, uy.min() + vy * sy, ".", ms=2.2,
+                 color="#2b5fd9", alpha=0.9, label="measured points")
+    axes[2].plot(ux.min() + px * sx, uy.min() + py * sy, "x", ms=5, mew=1.1,
+                 color="#c0392b", label="detected transitions")
+    axes[2].legend(frameon=False, fontsize=8, loc="upper right")
+    axes[2].set_title(f"{n_rays} rays × {n_points} points", fontsize=11)
+
+    cm = plt.get_cmap("hot").copy(); cm.set_bad("#f2f2f2")
+    vis = ch[ray_peaks.CH_VISITED]
+    axes[3].imshow(np.where(vis > 0.5, ch[ray_peaks.CH_SIGNAL], np.nan),
+                   origin="lower", cmap=cm, vmin=0, vmax=1, extent=ext,
+                   aspect="auto", interpolation="nearest")
+    axes[3].set_title(f"what the network is shown\n{100 * vis.mean():.1f} % "
+                      f"of the grid", fontsize=11)
+
+    for ax in axes:
+        ax.set_xticks([]); ax.set_yticks([])
+        for sp in ax.spines.values():
+            sp.set_color("#999999")
+    fig.tight_layout()
+    save(fig, "fig_measurement_panel")
+
+
 if __name__ == "__main__":
     print("figures ->", HERE)
     fig_network_input()
@@ -512,3 +571,4 @@ if __name__ == "__main__":
     fig_model_flow()
     fig_panels()
     fig_charge_sensor()
+    fig_measurement_panel()
