@@ -286,7 +286,7 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
     fig = plt.figure(figsize=(12.6, 8.6))
     # three panels per row, so each is as large as the slide allows
     gs = fig.add_gridspec(2, 3, height_ratios=[1.0, 1.0],
-                          hspace=0.34, wspace=0.12,
+                          hspace=0.40, wspace=0.12,
                           left=0.035, right=0.99, top=0.88, bottom=0.075)
 
     def blank(ax):
@@ -335,7 +335,7 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
             for sp in ax.spines.values():
                 sp.set_color("#c0392b"); sp.set_linewidth(2.2)
 
-    # ── row 2: ONE prediction, scored at four tolerances ─────────────────
+    # ── row 2: ONE prediction, scored at three tolerances ─────────────────
     pred = p > thr
     for k, tau in enumerate(TAUS):
         m = tolerant_f1(pred, Yt, float(tau))
@@ -351,10 +351,10 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
             for sp in ax.spines.values():
                 sp.set_color("#1f5fa8"); sp.set_linewidth(2.2)
 
-    fig.text(0.5, 0.975, "cutting the probability map at three thresholds",
+    fig.text(0.5, 0.975, "cutting the probability map at two thresholds",
              ha="center", fontsize=10.5, color=MUT)
-    fig.text(0.5, 0.468, "the SAME prediction (P > "
-             f"{thr:g}), scored at four tolerances τ — a predicted pixel "
+    fig.text(0.5, 0.492, "the SAME prediction (P > "
+             f"{thr:g}), scored at three tolerances τ — a predicted pixel "
              "counts as correct when a true line lies within τ pixels",
              ha="center", fontsize=10.5, color=MUT)
     for _x, _t, _c in (
