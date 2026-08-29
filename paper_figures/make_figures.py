@@ -42,6 +42,13 @@ N_RAYS, N_POINTS = 8, 60
 
 INK = "#111111"
 MUT = "#5a606a"
+
+# Error colours for the reconstruction panels, taken from the deck's own
+# theme (teal / red / plum) rather than green and orange.
+HIT_HEX, MISS_HEX, FALSE_HEX = "#1B587C", "#9F2936", "#7A5C99"
+HIT_RGB = (0.106, 0.345, 0.486)
+MISS_RGB = (0.624, 0.161, 0.212)
+FALSE_RGB = (0.478, 0.361, 0.600)
 plt.rcParams.update({
     "font.family": "sans-serif",
     "font.sans-serif": ["Arial", "DejaVu Sans"],
@@ -218,7 +225,7 @@ def fig_unet():
 CONFIG = "8_rays_60_points_500_samples"
 RUN_DIR = os.path.join(ROOT, "results",
                        "4-5-6-7-8_rays_40-50-60_points_500_samples")
-LADDER = (0.2, 0.4, 0.9)
+LADDER = (0.4, 0.9)
 
 # Which held-out device the results figure uses.  Index into test.npz:
 #   0 -> figures/test/sample_1 (pool sample_5)
@@ -274,13 +281,13 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
     truth = Yt > 0.5
     print(f"  picked device #33 (0.8 mV window)   threshold {thr:g}")
 
-    TAUS = (0, 1, 2, 3)
+    TAUS = (0, 1, 3)
     d_true_by_tau = {}
-    fig = plt.figure(figsize=(13.6, 7.2))
-    # four panels per row, so each is half again as large as before
-    gs = fig.add_gridspec(2, 4, height_ratios=[1.0, 1.0],
-                          hspace=0.42, wspace=0.16,
-                          left=0.035, right=0.99, top=0.86, bottom=0.09)
+    fig = plt.figure(figsize=(12.6, 8.6))
+    # three panels per row, so each is as large as the slide allows
+    gs = fig.add_gridspec(2, 3, height_ratios=[1.0, 1.0],
+                          hspace=0.34, wspace=0.12,
+                          left=0.035, right=0.99, top=0.88, bottom=0.075)
 
     def blank(ax):
         ax.set_xticks([]); ax.set_yticks([])
@@ -297,9 +304,9 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
         dp = (distance_transform_edt(~pred) if pred.any()
               else np.full(pred.shape, np.inf))
         rgb = np.ones(truth.shape + (3,))
-        rgb[pred & (dt > tau)] = (0.95, 0.55, 0.15)
-        rgb[truth & (dp > tau)] = (0.15, 0.40, 0.85)
-        rgb[pred & (dt <= tau)] = (0.12, 0.55, 0.28)
+        rgb[pred & (dt > tau)] = FALSE_RGB
+        rgb[truth & (dp > tau)] = MISS_RGB
+        rgb[pred & (dt <= tau)] = HIT_RGB
         return rgb
 
     # ── row 1: the output, the truth, and the map cut four ways ──────────
@@ -335,8 +342,7 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
         ax = fig.add_subplot(gs[1, k])
         ax.imshow(err_rgb(pred, float(tau)), origin="lower",
                   interpolation="nearest")
-        head = {0: "τ = 0   strict", 1: "τ = 1   headline"}.get(
-            tau, f"τ = {tau}")
+        head = {0: "τ = 0   strict"}.get(tau, f"τ = {tau}")
         ax.set_title(f"{head}\nF1@{tau} {m['f1']:.3f}", fontsize=11.5,
                      color="#1f5fa8" if tau == 1 else INK,
                      fontweight="bold" if tau == 1 else "normal")
@@ -347,15 +353,16 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
 
     fig.text(0.5, 0.975, "cutting the probability map at three thresholds",
              ha="center", fontsize=10.5, color=MUT)
-    fig.text(0.5, 0.478, "the SAME prediction (P > "
+    fig.text(0.5, 0.468, "the SAME prediction (P > "
              f"{thr:g}), scored at four tolerances τ — a predicted pixel "
              "counts as correct when a true line lies within τ pixels",
              ha="center", fontsize=10.5, color=MUT)
-    fig.text(0.5, 0.022,
-             "green = line found within τ      "
-             "blue = true line missed      "
-             "orange = line drawn that is not there",
-             ha="center", fontsize=9.5, color=MUT)
+    for _x, _t, _c in (
+            (0.22, "found  — a predicted line that really is there", HIT_HEX),
+            (0.53, "missed  — a real line the model did not draw", MISS_HEX),
+            (0.83, "false  — a line drawn where there is none", FALSE_HEX)):
+        fig.text(_x, 0.018, "■  " + _t, ha="center", fontsize=10.5,
+                 color=_c, fontweight="bold")
 
     save(fig, "fig_probability_to_lines")
 
