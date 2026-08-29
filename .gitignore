@@ -56,3 +56,6 @@ Thumbs.db
 
 # --- Claude Code local state ---
 .claude/settings.local.json
+
+# --- Personal Claude notes ---
+CLAUDE.local.md
