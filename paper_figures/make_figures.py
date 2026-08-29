@@ -266,7 +266,8 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
     n = len(ladder)
     fig = plt.figure(figsize=(11.6, 6.0))
     gs = fig.add_gridspec(2, 4, height_ratios=[1.16, 1.0],
-                          hspace=0.40, wspace=0.24)
+                          hspace=0.62, wspace=0.24,
+                          left=0.055, right=0.985, top=0.90, bottom=0.085)
 
     def blank(ax):
         ax.set_xticks([]); ax.set_yticks([])
@@ -333,7 +334,7 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
             for sp in ax.spines.values():
                 sp.set_color("#c0392b"); sp.set_linewidth(2.4)
 
-    fig.text(0.5, 0.475, "the same probability map, cut at four thresholds "
+    fig.text(0.5, 0.435, "the same probability map, cut at four thresholds "
                          "on a HELD-OUT device", ha="center", fontsize=10,
              color=MUT)
     fig.text(0.5, 0.012,
@@ -341,7 +342,6 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
              "blue = true line missed      "
              "orange = line drawn that is not there",
              ha="center", fontsize=9.5, color=MUT)
-    fig.tight_layout(rect=(0, 0.03, 1, 1))
     save(fig, "fig_probability_to_lines")
 
 
