@@ -274,12 +274,8 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
     truth = Yt > 0.5
     print(f"  picked device #33 (0.8 mV window)   threshold {thr:g}")
 
-    cand, vf1, n_val = _validation_curve(net, cfg_dir)
-    best = cand[int(np.argmax(vf1))]
-    print(f"  validation split: {n_val} devices, best threshold {best:g}")
-
     n = len(ladder)
-    fig = plt.figure(figsize=(11.6, 6.0))
+    fig = plt.figure(figsize=(10.4, 6.4))
     gs = fig.add_gridspec(2, 4, height_ratios=[1.16, 1.0],
                           hspace=0.62, wspace=0.24,
                           left=0.055, right=0.985, top=0.90, bottom=0.085)
@@ -290,7 +286,7 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
             sp.set_color("#999999")
 
     # ── what the network outputs, and what it should be ──────────────────
-    ax = fig.add_subplot(gs[0, 0])
+    ax = fig.add_subplot(gs[0, 0:2])
     im = ax.imshow(p, origin="lower", cmap="magma", vmin=0, vmax=1,
                    interpolation="nearest")
     ax.set_title("the U-Net output\nP(transition line) per pixel",
@@ -299,31 +295,12 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
         labelsize=7.5)
     blank(ax)
 
-    ax = fig.add_subplot(gs[0, 1])
+    ax = fig.add_subplot(gs[0, 2:4])
     ax.imshow(1 - truth, origin="lower", cmap="gray",
               interpolation="nearest")
     ax.set_title(f"ground truth\n{100 * truth.mean():.1f} % line pixels",
                  fontsize=10.5)
     blank(ax)
-
-    # ── the secret: the cut is chosen on the validation split ────────────
-    ax = fig.add_subplot(gs[0, 2:])
-    ax.plot(cand, vf1, "-o", color="#1f5fa8", lw=1.8, ms=5, mfc="white",
-            label="F1@1 on the validation split")
-    ax.axvline(thr, color="#c0392b", lw=1.7)
-    ax.annotate(f"chosen: {thr:g}", xy=(thr, vf1.max()),
-                xytext=(6, -12), textcoords="offset points",
-                fontsize=9.5, color="#c0392b", fontweight="bold")
-    ax.set_xlabel("candidate threshold", fontsize=9.5)
-    ax.set_ylabel("F1@1", fontsize=9.5)
-    ax.set_title(f"how the threshold is picked: apply the model to the "
-                 f"{n_val} VALIDATION devices\ncarved out of the training set, "
-                 f"and keep the cut that scores best", fontsize=10)
-    ax.tick_params(labelsize=8.5)
-    ax.grid(alpha=0.25, lw=0.6)
-    ax.legend(frameon=False, fontsize=8.5, loc="lower left")
-    for sp in ("top", "right"):
-        ax.spines[sp].set_visible(False)
 
     # ── the same map cut four ways, on a held-out device ─────────────────
     d_true = (distance_transform_edt(~truth) if truth.any()

@@ -1,0 +1,39 @@
+Deck and the figures it uses, one folder per slide.
+Images are extracted from the .pptx itself, so they are exactly
+what each slide shows.  Where a vector version of the same
+figure exists it is copied alongside as .pdf.
+
+slide  1  Ray-Based Reconstruction of Charge Stability Diagrams with a Probabilistic Transition-Line Model
+          01_image1.png
+          02_image2.png
+
+slide  3  Introduction
+          01_pick_stability.png  (+ pdf)
+
+slide  4  Previous work
+          01_V. Hernandes et al_image1.png
+          02_Yui muto et al_image1.png
+
+slide  5  Ray-based classification (RBC)
+          01_RBC1.png
+          02_RBC_alizadeh.png
+
+slide  6  Device simulation: QArray
+          01_constant_capacitance_model.png
+          02_pick_charge_sensor.png  (+ pdf)
+          03_pick_stability.png  (+ pdf)
+
+slide  7  Ray-based measurement
+          01_fig_measurement_panel.png  (+ pdf)
+
+slide  8  Our model
+          01_panel_channel1.png  (+ pdf)
+          02_panel_channel2.png  (+ pdf)
+          03_fig_unet.png  (+ pdf)
+          04_panel_probability.png  (+ pdf)
+
+slide  9  From probability to lines
+          01_fig_probability_to_lines.png  (+ pdf)
+
+slide 10  Results
+          01_02_f1_vs_coverage.png
