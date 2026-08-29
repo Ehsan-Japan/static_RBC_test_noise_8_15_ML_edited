@@ -532,7 +532,7 @@ def fig_measurement_panel(n_rays=8, n_points=60):
     sx = (ux.max() - ux.min()) / (len(ux) - 1)
     sy = (uy.max() - uy.min()) / (len(uy) - 1)
 
-    fig, axes = plt.subplots(1, 4, figsize=(14.0, 3.6))
+    fig, axes = plt.subplots(1, 3, figsize=(10.8, 3.7))
 
     axes[0].imshow(Z, origin="lower", cmap="hot", extent=ext, aspect="auto",
                    interpolation="nearest")
@@ -542,24 +542,14 @@ def fig_measurement_panel(n_rays=8, n_points=60):
                    aspect="auto", interpolation="nearest")
     axes[1].set_title("stability diagram\n(ground truth)", fontsize=11)
 
-    axes[2].imshow(1 - truth, origin="lower", cmap="gray", extent=ext,
-                   aspect="auto", interpolation="nearest")
-    vy, vx = np.nonzero(ch[ray_peaks.CH_VISITED] > 0.5)
-    py, px = np.nonzero(ch[ray_peaks.CH_PEAKS] > 0.5)
-    axes[2].plot(ux.min() + vx * sx, uy.min() + vy * sy, ".", ms=2.2,
-                 color="#2b5fd9", alpha=0.9, label="measured points")
-    axes[2].plot(ux.min() + px * sx, uy.min() + py * sy, "x", ms=5, mew=1.1,
-                 color="#c0392b", label="detected transitions")
-    axes[2].legend(frameon=False, fontsize=8, loc="upper right")
-    axes[2].set_title(f"{n_rays} rays × {n_points} points", fontsize=11)
-
     cm = plt.get_cmap("hot").copy(); cm.set_bad("#f2f2f2")
     vis = ch[ray_peaks.CH_VISITED]
-    axes[3].imshow(np.where(vis > 0.5, ch[ray_peaks.CH_SIGNAL], np.nan),
+    axes[2].imshow(np.where(vis > 0.5, ch[ray_peaks.CH_SIGNAL], np.nan),
                    origin="lower", cmap=cm, vmin=0, vmax=1, extent=ext,
                    aspect="auto", interpolation="nearest")
-    axes[3].set_title(f"what the network is shown\n{100 * vis.mean():.1f} % "
-                      f"of the grid", fontsize=11)
+    axes[2].set_title(f"{n_rays} rays × {n_points} points\nwhat the network "
+                      f"is shown  ({100 * vis.mean():.1f} % of the grid)",
+                      fontsize=11)
 
     for ax in axes:
         ax.set_xticks([]); ax.set_yticks([])
