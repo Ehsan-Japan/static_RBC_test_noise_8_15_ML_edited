@@ -28,8 +28,10 @@ ROOT = os.path.abspath(os.path.join(HERE, ".."))
 POOL = os.path.join(ROOT, "training_data", "_device_pools",
                     "devices_n550_res100_c1df7b6bf")
 
-# test device 1 = first entry of test_ids (device_id 4) = pool sample_5
-DEVICE = os.path.join(POOL, "sample_5")
+# The device used for the INPUT / MASK explanation.  pool sample_1 is a
+# TRAINING device (device_id 0) — fine here, because this figure only shows
+# what a measurement looks like and makes no accuracy claim.
+DEVICE = os.path.join(POOL, "sample_1")
 N_RAYS, N_POINTS = 8, 60
 
 INK = "#111111"
@@ -61,24 +63,24 @@ def fig_network_input(compact=False):
 
     fig, axes = plt.subplots(1, 2, figsize=(8.4, 4.3))
 
-    # channel 0 — the measured value, shown only where a ray passed
+    # channel 1 — the measured value, shown only where a ray passed
     cm = plt.get_cmap("inferno").copy()
     cm.set_bad("#f2f2f2")
     ax = axes[0]
     im = ax.imshow(np.where(vis > 0.5, sig, np.nan), origin="lower", cmap=cm,
                    vmin=0, vmax=1, interpolation="nearest")
-    ax.set_title("channel 0   —   measured sensor signal", fontsize=11,
+    ax.set_title("channel 1   —   measured sensor signal", fontsize=11,
                  color=INK, pad=9)
     cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
     cb.set_label("normalised charge-sensor signal", fontsize=8.5)
     cb.ax.tick_params(labelsize=8)
     ax.set_xlabel("grey = never measured", fontsize=9, color=MUT)
 
-    # channel 1 — where we looked at all
+    # channel 2 — where we looked at all
     ax = axes[1]
     ax.imshow(1.0 - vis, origin="lower", cmap="gray", vmin=0, vmax=1,
               interpolation="nearest")
-    ax.set_title("channel 1   —   visited mask", fontsize=11, color=INK,
+    ax.set_title("channel 2   —   visited mask", fontsize=11, color=INK,
                  pad=9)
     ax.set_xlabel(f"black = a ray passed here  ({cov:.1f} % of the grid)",
                   fontsize=9, color=MUT)
@@ -95,9 +97,9 @@ def fig_network_input(compact=False):
                      f"{N_POINTS} points, one held-out device",
                      fontsize=12.5, color=INK, y=1.0)
         fig.text(0.5, -0.045,
-                 "Channel 1 is what separates “measured here, and the signal "
+                 "Channel 2 is what separates “measured here, and the signal "
                  "was low” from “never looked here”.  Without it a zero in "
-                 "channel 0 is ambiguous everywhere.",
+                 "channel 1 is ambiguous everywhere.",
                  ha="center", fontsize=9.5, color=MUT)
     fig.tight_layout()
     save(fig, "fig_network_input_slide" if compact else "fig_network_input")
@@ -173,7 +175,7 @@ def fig_unet():
     ax.text(4.66, lvl[0][1] + 0.02, "skip connections",
             ha="center", fontsize=8.5, color=MUT, style="italic")
 
-    ax.text(0.42, 0.16, "channel 0  ray signal\nchannel 1  visited mask",
+    ax.text(0.42, 0.16, "channel 1  ray signal\nchannel 2  visited mask",
             ha="center", va="top", fontsize=8.5, color=MUT)
     ax.text(8.68, 0.16, "P(transition line)\nper pixel",
             ha="center", va="top", fontsize=8.5, color=MUT)
@@ -196,12 +198,18 @@ RUN_DIR = os.path.join(ROOT, "results",
                        "4-5-6-7-8_rays_40-50-60_points_500_samples")
 LADDER = (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
 
+# Which held-out device the results figure uses.  Index into test.npz:
+#   0 -> figures/test/sample_1 (pool sample_5)
+#   1 -> figures/test/sample_2 (pool sample_10)   <- the one we show
+# Both are in test_ids, so the network never saw them during training.
+RESULT_DEVICE = 1
+
 
 def fig_probability_to_lines(device_index=None, ladder=LADDER):
     """
     One held-out device end to end:
 
-        row 1   channel 0 | channel 1 | probability map | ground truth
+        row 1   channel 1 | channel 2 | probability map | ground truth
         row 2   the same probability map cut at a ladder of thresholds,
                 the checkpoint's own threshold framed in red
 
@@ -224,8 +232,9 @@ def fig_probability_to_lines(device_index=None, ladder=LADDER):
     if device_index is None:
         device_index = int(np.argmin(np.abs(f1 - f1.mean())))
     i = device_index
-    print(f"  device {names[i]}  F1@1 {f1[i]:.3f}  "
-          f"(mean over {len(f1)} test devices {f1.mean():.3f})")
+    print(f"  figures/test/sample_{i + 1} = {os.path.basename(names[i])}  "
+          f"F1@1 {f1[i]:.3f}  "
+          f"(mean over {len(f1)} held-out devices {f1.mean():.3f})")
 
     sig, vis = X[i][0], X[i][1]
     p, truth = prob[i], Y[i] > 0.5
@@ -247,13 +256,13 @@ def fig_probability_to_lines(device_index=None, ladder=LADDER):
     ax = fig.add_subplot(gs[0, 0:span])
     ax.imshow(np.where(vis > 0.5, sig, np.nan), origin="lower", cmap=cm,
               vmin=0, vmax=1, interpolation="nearest")
-    ax.set_title("input · channel 0\nmeasured sensor signal", fontsize=10.5)
+    ax.set_title("input · channel 1\nmeasured sensor signal", fontsize=10.5)
     blank(ax)
 
     ax = fig.add_subplot(gs[0, span:2 * span])
     ax.imshow(1.0 - vis, origin="lower", cmap="gray", vmin=0, vmax=1,
               interpolation="nearest")
-    ax.set_title(f"input · channel 1\nvisited mask "
+    ax.set_title(f"input · channel 2\nvisited mask "
                  f"({100 * vis.mean():.1f} % of the grid)", fontsize=10.5)
     blank(ax)
 
@@ -313,4 +322,4 @@ if __name__ == "__main__":
     fig_network_input()
     fig_network_input(compact=True)
     fig_unet()
-    fig_probability_to_lines()
+    fig_probability_to_lines(RESULT_DEVICE)

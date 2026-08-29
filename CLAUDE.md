@@ -72,10 +72,11 @@ are the stages. `benchmark.py` is the geometry ablation.
 - **Measurement** — n rays × n points fired from one corner of the window.
   A ray crossing a transition line gives a local maximum in the sensor
   current. Rays are oblique, so one ray crosses both honeycomb families.
-- **Network input** — 2 channels only: ch0 = raw sensor value where a ray
-  passed, ch1 = visited mask (so "measured and low" is distinguishable from
+- **Network input** — 2 channels only: the raw sensor value where a ray
+  passed, and the visited mask (so "measured and low" is distinguishable from
   "never measured"). The peaks channel exists for figures; the network never
-  sees it.
+  sees it. In code these are `CH_SIGNAL = 0` and `CH_VISITED = 1`; in the
+  slides and the paper they are called **channel 1** and **channel 2**.
 - **Network** — fully convolutional U-Net, depth 3 (32→64→128, bottleneck
   256), sigmoid head → **one probability per pixel**.
 - **Loss** — BCEWithLogits with the positive class weighted by its rarity
