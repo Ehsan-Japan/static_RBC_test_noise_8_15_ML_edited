@@ -274,66 +274,96 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
     truth = Yt > 0.5
     print(f"  picked device #33 (0.8 mV window)   threshold {thr:g}")
 
-    n = len(ladder)
-    fig = plt.figure(figsize=(10.4, 6.4))
-    gs = fig.add_gridspec(2, 4, height_ratios=[1.16, 1.0],
-                          hspace=0.62, wspace=0.24,
-                          left=0.055, right=0.985, top=0.90, bottom=0.085)
+    TAUS = (0, 1, 2, 3)
+    d_true_by_tau = {}
+    fig = plt.figure(figsize=(15.6, 6.3))
+    # row 1: six panels (2 cols each); row 2: four panels (3 cols each)
+    gs = fig.add_gridspec(2, 12, height_ratios=[1.0, 1.0],
+                          hspace=0.78, wspace=0.30,
+                          left=0.03, right=0.985, top=0.83, bottom=0.11)
 
     def blank(ax):
         ax.set_xticks([]); ax.set_yticks([])
         for sp in ax.spines.values():
             sp.set_color("#999999")
 
-    # ── what the network outputs, and what it should be ──────────────────
+    def err_rgb(pred, tau):
+        """green = hit within tau, blue = missed line, orange = false line."""
+        if tau not in d_true_by_tau:
+            d_true_by_tau[tau] = (distance_transform_edt(~truth)
+                                  if truth.any()
+                                  else np.full(truth.shape, np.inf))
+        dt = d_true_by_tau[tau]
+        dp = (distance_transform_edt(~pred) if pred.any()
+              else np.full(pred.shape, np.inf))
+        rgb = np.ones(truth.shape + (3,))
+        rgb[pred & (dt > tau)] = (0.95, 0.55, 0.15)
+        rgb[truth & (dp > tau)] = (0.15, 0.40, 0.85)
+        rgb[pred & (dt <= tau)] = (0.12, 0.55, 0.28)
+        return rgb
+
+    # ── row 1: the output, the truth, and the map cut four ways ──────────
     ax = fig.add_subplot(gs[0, 0:2])
     im = ax.imshow(p, origin="lower", cmap="magma", vmin=0, vmax=1,
                    interpolation="nearest")
-    ax.set_title("the U-Net output\nP(transition line) per pixel",
-                 fontsize=10.5, color="#7d2b3a")
+    ax.set_title("U-Net output\nP(transition line)", fontsize=10,
+                 color="#7d2b3a")
     fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03).ax.tick_params(
-        labelsize=7.5)
+        labelsize=6.5)
     blank(ax)
 
     ax = fig.add_subplot(gs[0, 2:4])
     ax.imshow(1 - truth, origin="lower", cmap="gray",
               interpolation="nearest")
     ax.set_title(f"ground truth\n{100 * truth.mean():.1f} % line pixels",
-                 fontsize=10.5)
+                 fontsize=10)
     blank(ax)
 
-    # ── the same map cut four ways, on a held-out device ─────────────────
-    d_true = (distance_transform_edt(~truth) if truth.any()
-              else np.full(truth.shape, np.inf))
     for k, t in enumerate(ladder):
         pred = p > t
-        m = tolerant_f1(pred, Y[i], 1.0)
-        d_pred = (distance_transform_edt(~pred) if pred.any()
-                  else np.full(pred.shape, np.inf))
-        rgb = np.ones(truth.shape + (3,))
-        rgb[pred & (d_true > 1.0)] = (0.95, 0.55, 0.15)
-        rgb[truth & (d_pred > 1.0)] = (0.15, 0.40, 0.85)
-        rgb[pred & (d_true <= 1.0)] = (0.12, 0.55, 0.28)
-        ax = fig.add_subplot(gs[1, k])
-        ax.imshow(rgb, origin="lower", interpolation="nearest")
+        m = tolerant_f1(pred, Yt, 1.0)
+        ax = fig.add_subplot(gs[0, 4 + 2 * k:6 + 2 * k])
+        ax.imshow(err_rgb(pred, 1.0), origin="lower",
+                  interpolation="nearest")
         chosen = abs(t - thr) < 1e-9
-        ax.set_title(f"P > {t:g}" + ("   (chosen)" if chosen else "") +
+        ax.set_title(f"P > {t:g}" + ("  (chosen)" if chosen else "") +
                      f"\nF1@1 {m['f1']:.3f}", fontsize=10,
                      color="#c0392b" if chosen else INK,
                      fontweight="bold" if chosen else "normal")
         blank(ax)
         if chosen:
             for sp in ax.spines.values():
-                sp.set_color("#c0392b"); sp.set_linewidth(2.4)
+                sp.set_color("#c0392b"); sp.set_linewidth(2.2)
 
-    fig.text(0.5, 0.435, "the same probability map, cut at four thresholds "
-                         "on an unseen device (0.8 mV window)", ha="center", fontsize=10,
-             color=MUT)
-    fig.text(0.5, 0.012,
-             "green = line found within 1 px      "
+    # ── row 2: ONE prediction, scored at four tolerances ─────────────────
+    pred = p > thr
+    for k, tau in enumerate(TAUS):
+        m = tolerant_f1(pred, Yt, float(tau))
+        ax = fig.add_subplot(gs[1, 2 + 2 * k:4 + 2 * k])
+        ax.imshow(err_rgb(pred, float(tau)), origin="lower",
+                  interpolation="nearest")
+        head = {0: "τ = 0   strict", 1: "τ = 1   headline"}.get(
+            tau, f"τ = {tau}")
+        ax.set_title(f"{head}\nF1@{tau} {m['f1']:.3f}", fontsize=10,
+                     color="#1f5fa8" if tau == 1 else INK,
+                     fontweight="bold" if tau == 1 else "normal")
+        blank(ax)
+        if tau == 1:
+            for sp in ax.spines.values():
+                sp.set_color("#1f5fa8"); sp.set_linewidth(2.2)
+
+    fig.text(0.5, 0.965, "cutting the probability map at four thresholds",
+             ha="center", fontsize=10.5, color=MUT)
+    fig.text(0.5, 0.505, "the SAME prediction (P > "
+             f"{thr:g}), scored at four tolerances τ — a predicted pixel "
+             "counts as correct when a true line lies within τ pixels",
+             ha="center", fontsize=10.5, color=MUT)
+    fig.text(0.5, 0.022,
+             "green = line found within τ      "
              "blue = true line missed      "
              "orange = line drawn that is not there",
              ha="center", fontsize=9.5, color=MUT)
+
     save(fig, "fig_probability_to_lines")
 
 
