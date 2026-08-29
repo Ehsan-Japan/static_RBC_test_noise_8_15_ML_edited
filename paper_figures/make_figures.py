@@ -205,12 +205,14 @@ def fig_unet():
 
 
 
-# ── figure 3: input → probability → binarised at a ladder of thresholds ───
-# This one needs the trained network: results/<config>/model/unet.pt
+# ── figure 3: the probability map, and where the threshold comes from ─────
+# No input channels here — those live on the model slide.  This figure is
+# only about turning a continuous map into lines, and about the fact that
+# the cut is chosen on a VALIDATION split, never on the test devices.
 CONFIG = "8_rays_60_points_500_samples"
 RUN_DIR = os.path.join(ROOT, "results",
                        "4-5-6-7-8_rays_40-50-60_points_500_samples")
-LADDER = (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
+LADDER = (0.2, 0.4, 0.6, 0.9)
 
 # Which held-out device the results figure uses.  Index into test.npz:
 #   0 -> figures/test/sample_1 (pool sample_5)
@@ -219,84 +221,95 @@ LADDER = (0.2, 0.3, 0.4, 0.5, 0.6, 0.7, 0.8, 0.9)
 RESULT_DEVICE = 1
 
 
-def fig_probability_to_lines(device_index=None, ladder=LADDER):
+def _validation_curve(net, cfg_dir):
     """
-    One held-out device end to end:
-
-        row 1   channel 1 | channel 2 | probability map | ground truth
-        row 2   the same probability map cut at a ladder of thresholds,
-                the checkpoint's own threshold framed in red
-
-    device_index : None picks the device whose F1@1 at the chosen threshold
-                   is closest to the configuration's mean, so the figure is
-                   representative rather than cherry-picked.
+    Re-derive the exact validation split the training used and score every
+    candidate threshold on it.  grid_train carves it out with
+    default_rng(SEED) before training, so this is reproducible.
     """
     from dqd.ml import grid_train
     from dqd.ml.grid_metrics import tolerant_f1
     from dqd.study.dataset import load_split
 
+    Xtr, Ytr, _ = load_split(os.path.join(cfg_dir, "train.npz"))
+    rng = np.random.default_rng(grid_train.SEED)
+    idx = rng.permutation(len(Xtr))
+    n_val = max(1, int(grid_train.VAL_FRACTION * len(Xtr)))
+    vi = idx[:n_val]
+    pv, Yv = grid_train.predict(net, Xtr[vi]), Ytr[vi]
+    cand = np.array(grid_train.THRESHOLDS)
+    f1 = np.array([np.mean([tolerant_f1(pv[j] > t, Yv[j], 1.0)["f1"]
+                            for j in range(len(Yv))]) for t in cand])
+    return cand, f1, len(vi)
+
+
+def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
+    from dqd.ml import grid_train
+    from dqd.ml.grid_metrics import tolerant_f1
+    from dqd.study.dataset import load_split
+    from scipy.ndimage import distance_transform_edt
+
     cfg_dir = os.path.join(RUN_DIR, CONFIG)
     X, Y, names = load_split(os.path.join(cfg_dir, "test.npz"))
     net, ck = grid_train.load(os.path.join(cfg_dir, "model", "unet.pt"))
     thr = float(ck["threshold"])
-    prob = grid_train.predict(net, X)
-
-    f1 = np.array([tolerant_f1(prob[i] > thr, Y[i], 1.0)["f1"]
-                   for i in range(len(X))])
-    if device_index is None:
-        device_index = int(np.argmin(np.abs(f1 - f1.mean())))
     i = device_index
-    print(f"  figures/test/sample_{i + 1} = {os.path.basename(names[i])}  "
-          f"F1@1 {f1[i]:.3f}  "
-          f"(mean over {len(f1)} held-out devices {f1.mean():.3f})")
+    p = grid_train.predict(net, X[i:i + 1])[0]
+    truth = Y[i] > 0.5
+    print(f"  figures/test/sample_{i + 1} = {os.path.basename(names[i])}   "
+          f"threshold {thr:g}")
 
-    sig, vis = X[i][0], X[i][1]
-    p, truth = prob[i], Y[i] > 0.5
+    cand, vf1, n_val = _validation_curve(net, cfg_dir)
+    best = cand[int(np.argmax(vf1))]
+    print(f"  validation split: {n_val} devices, best threshold {best:g}")
+
     n = len(ladder)
-
-    fig = plt.figure(figsize=(2.15 * n, 5.6))
-    gs = fig.add_gridspec(2, n, height_ratios=[1.28, 1.0], hspace=0.34,
-                          wspace=0.10)
+    fig = plt.figure(figsize=(11.6, 6.0))
+    gs = fig.add_gridspec(2, 4, height_ratios=[1.16, 1.0],
+                          hspace=0.40, wspace=0.24)
 
     def blank(ax):
         ax.set_xticks([]); ax.set_yticks([])
-        for s in ax.spines.values():
-            s.set_color("#999999")
+        for sp in ax.spines.values():
+            sp.set_color("#999999")
 
-    # ── row 1: what goes in, what comes out ──────────────────────────────
-    span = n // 4
-    cm = plt.get_cmap("inferno").copy(); cm.set_bad("#f2f2f2")
-
-    ax = fig.add_subplot(gs[0, 0:span])
-    ax.imshow(np.where(vis > 0.5, sig, np.nan), origin="lower", cmap=cm,
-              vmin=0, vmax=1, interpolation="nearest")
-    ax.set_title("input · channel 1\nmeasured sensor signal", fontsize=10.5)
-    blank(ax)
-
-    ax = fig.add_subplot(gs[0, span:2 * span])
-    ax.imshow(1.0 - vis, origin="lower", cmap="gray", vmin=0, vmax=1,
-              interpolation="nearest")
-    ax.set_title(f"input · channel 2\nvisited mask "
-                 f"({100 * vis.mean():.1f} % of the grid)", fontsize=10.5)
-    blank(ax)
-
-    ax = fig.add_subplot(gs[0, 2 * span:3 * span])
+    # ── what the network outputs, and what it should be ──────────────────
+    ax = fig.add_subplot(gs[0, 0])
     im = ax.imshow(p, origin="lower", cmap="magma", vmin=0, vmax=1,
                    interpolation="nearest")
-    ax.set_title("output\nP(transition line) per pixel", fontsize=10.5,
-                 color="#7d2b3a")
+    ax.set_title("the U-Net output\nP(transition line) per pixel",
+                 fontsize=10.5, color="#7d2b3a")
     fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03).ax.tick_params(
-        labelsize=8)
+        labelsize=7.5)
     blank(ax)
 
-    ax = fig.add_subplot(gs[0, 3 * span:])
-    ax.imshow(1 - truth, origin="lower", cmap="gray", interpolation="nearest")
+    ax = fig.add_subplot(gs[0, 1])
+    ax.imshow(1 - truth, origin="lower", cmap="gray",
+              interpolation="nearest")
     ax.set_title(f"ground truth\n{100 * truth.mean():.1f} % line pixels",
                  fontsize=10.5)
     blank(ax)
 
-    # ── row 2: the same map, cut at a ladder of thresholds ───────────────
-    from scipy.ndimage import distance_transform_edt
+    # ── the secret: the cut is chosen on the validation split ────────────
+    ax = fig.add_subplot(gs[0, 2:])
+    ax.plot(cand, vf1, "-o", color="#1f5fa8", lw=1.8, ms=5, mfc="white",
+            label="F1@1 on the validation split")
+    ax.axvline(thr, color="#c0392b", lw=1.7)
+    ax.annotate(f"chosen: {thr:g}", xy=(thr, vf1.max()),
+                xytext=(6, -12), textcoords="offset points",
+                fontsize=9.5, color="#c0392b", fontweight="bold")
+    ax.set_xlabel("candidate threshold", fontsize=9.5)
+    ax.set_ylabel("F1@1", fontsize=9.5)
+    ax.set_title(f"how the threshold is picked: apply the model to the "
+                 f"{n_val} VALIDATION devices\ncarved out of the training set, "
+                 f"and keep the cut that scores best", fontsize=10)
+    ax.tick_params(labelsize=8.5)
+    ax.grid(alpha=0.25, lw=0.6)
+    ax.legend(frameon=False, fontsize=8.5, loc="lower left")
+    for sp in ("top", "right"):
+        ax.spines[sp].set_visible(False)
+
+    # ── the same map cut four ways, on a held-out device ─────────────────
     d_true = (distance_transform_edt(~truth) if truth.any()
               else np.full(truth.shape, np.inf))
     for k, t in enumerate(ladder):
@@ -305,29 +318,30 @@ def fig_probability_to_lines(device_index=None, ladder=LADDER):
         d_pred = (distance_transform_edt(~pred) if pred.any()
                   else np.full(pred.shape, np.inf))
         rgb = np.ones(truth.shape + (3,))
-        rgb[pred & (d_true > 1.0)] = (0.95, 0.55, 0.15)     # false alarm
-        rgb[truth & (d_pred > 1.0)] = (0.15, 0.40, 0.85)    # missed line
-        rgb[pred & (d_true <= 1.0)] = (0.12, 0.55, 0.28)    # hit
+        rgb[pred & (d_true > 1.0)] = (0.95, 0.55, 0.15)
+        rgb[truth & (d_pred > 1.0)] = (0.15, 0.40, 0.85)
+        rgb[pred & (d_true <= 1.0)] = (0.12, 0.55, 0.28)
         ax = fig.add_subplot(gs[1, k])
         ax.imshow(rgb, origin="lower", interpolation="nearest")
         chosen = abs(t - thr) < 1e-9
-        ax.set_title(f"P > {t:g}\nF1@1 {m['f1']:.3f}", fontsize=10,
+        ax.set_title(f"P > {t:g}" + ("   (chosen)" if chosen else "") +
+                     f"\nF1@1 {m['f1']:.3f}", fontsize=10,
                      color="#c0392b" if chosen else INK,
                      fontweight="bold" if chosen else "normal")
         blank(ax)
         if chosen:
-            for s in ax.spines.values():
-                s.set_color("#c0392b"); s.set_linewidth(2.4)
+            for sp in ax.spines.values():
+                sp.set_color("#c0392b"); sp.set_linewidth(2.4)
 
-    fig.text(0.5, 0.455,
-             "the probability map binarised at a ladder of thresholds — "
-             "red frame = the threshold chosen on the validation split",
-             ha="center", fontsize=10, color=MUT)
+    fig.text(0.5, 0.475, "the same probability map, cut at four thresholds "
+                         "on a HELD-OUT device", ha="center", fontsize=10,
+             color=MUT)
     fig.text(0.5, 0.012,
              "green = line found within 1 px      "
              "blue = true line missed      "
              "orange = line drawn that is not there",
              ha="center", fontsize=9.5, color=MUT)
+    fig.tight_layout(rect=(0, 0.03, 1, 1))
     save(fig, "fig_probability_to_lines")
 
 
