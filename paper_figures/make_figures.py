@@ -64,7 +64,7 @@ def fig_network_input(compact=False):
     fig, axes = plt.subplots(1, 2, figsize=(8.4, 4.3))
 
     # channel 1 — the measured value, shown only where a ray passed
-    cm = plt.get_cmap("inferno").copy()
+    cm = plt.get_cmap("hot").copy()
     cm.set_bad("#f2f2f2")
     ax = axes[0]
     im = ax.imshow(np.where(vis > 0.5, sig, np.nan), origin="lower", cmap=cm,
@@ -371,7 +371,7 @@ def fig_model_flow(device_index=RESULT_DEVICE):
         for sp in ax.spines.values():
             sp.set_color("#999999")
 
-    cm = plt.get_cmap("inferno").copy(); cm.set_bad("#f2f2f2")
+    cm = plt.get_cmap("hot").copy(); cm.set_bad("#f2f2f2")
     ax1 = fig.add_subplot(gs[0, 0])
     ax1.imshow(np.where(vis > 0.5, sig, np.nan), origin="lower", cmap=cm,
                vmin=0, vmax=1, interpolation="nearest")
@@ -444,7 +444,7 @@ def fig_panels(device_index=RESULT_DEVICE):
         fig.tight_layout()
         save(fig, name)
 
-    cm = plt.get_cmap("inferno").copy(); cm.set_bad("#f2f2f2")
+    cm = plt.get_cmap("hot").copy(); cm.set_bad("#f2f2f2")
     panel(lambda ax: ax.imshow(np.where(vis > 0.5, sig, np.nan),
                                origin="lower", cmap=cm, vmin=0, vmax=1,
                                interpolation="nearest"),
@@ -478,7 +478,7 @@ def fig_charge_sensor(device=None):
     fig, axes = plt.subplots(1, 2, figsize=(8.6, 4.1))
 
     ax = axes[0]
-    im = ax.imshow(Z, origin="lower", cmap="inferno", extent=ext,
+    im = ax.imshow(Z, origin="lower", cmap="hot", extent=ext,
                    aspect="auto", interpolation="nearest")
     ax.set_title("as measured\na large smooth background", fontsize=11)
     fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03).ax.tick_params(
