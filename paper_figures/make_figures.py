@@ -808,15 +808,24 @@ def fig_results_f1_vs_coverage():
         v.sort()
 
     fig, ax = plt.subplots(figsize=(5.6, 3.7))
-    greys = {4: "#b4b4b4", 5: "#8e8e8e", 6: "#6a6a6a", 7: "#454545"}
+    # Ray count is ORDERED, so the series run light-blue -> blue -> navy ->
+    # black -> red: still a ramp, but each step changes hue as well as
+    # lightness, and each carries its own marker.  Four greys were
+    # indistinguishable on a projector, and marker shape survives greyscale
+    # printing and the common colour-vision deficiencies.
+    STYLE = {4: ("#9ECAE1", "o"), 5: ("#4292C6", "s"), 6: ("#08519C", "^"),
+             7: ("#000000", "D"), 8: (J_PRED, "o")}
     for n in sorted(by_rays):
         x = [c for c, _f, _p in by_rays[n]]
         y = [f for _c, f, _p in by_rays[n]]
+        colour, marker = STYLE[n]
         best = n == max(by_rays)
-        ax.plot(x, y, "-o", color=J_PRED if best else greys[n],
-                linewidth=2.0 if best else 1.2,
-                markersize=5.5 if best else 4.2, zorder=4 if best else 2,
-                label=f"{n} rays")
+        ax.plot(x, y, marker=marker, linestyle="-", color=colour,
+                linewidth=2.2 if best else 1.5,
+                markersize=6.5 if best else 5.0,
+                markeredgecolor="white" if best else colour,
+                markeredgewidth=0.8 if best else 0.6,
+                zorder=4 if best else 2, label=f"{n} rays")
 
     # the honest comparison: same coverage, more rays
     ax.annotate("", xy=(2.33, 0.752), xytext=(2.35, 0.691),
@@ -839,16 +848,14 @@ def fig_results_f1_vs_coverage():
     ax.grid(True, color=J_GRID, linewidth=0.5, linestyle=(0, (1, 3)),
             alpha=0.85)
     ax.set_axisbelow(True)
-    ax.legend(fontsize=8.5, frameon=False, loc="lower right",
-              handlelength=1.8, labelspacing=0.3, borderpad=0.2)
+    ax.legend(fontsize=8.5, frameon=True, framealpha=0.92,
+              edgecolor="#cccccc", loc="lower right", handlelength=1.9,
+              labelspacing=0.35, borderpad=0.35)
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
     for sp in ("left", "bottom"):
         ax.spines[sp].set_color("#444444"); ax.spines[sp].set_linewidth(0.8)
-    ax.set_title("Accuracy against measurement cost\n"
-                 "each line is one ray count; the three points on it are "
-                 "40, 50, 60 points per ray",
-                 fontsize=10.5, color=INK, pad=8, loc="left")
+    # the title is a PowerPoint text box — see make_slide_pictures.py
     fig.tight_layout()
     save(fig, "results_f1_vs_coverage")
 
@@ -870,19 +877,18 @@ def fig_data_split():
     POOL, TEST = "#c8c8c8", "#1a1a1a"
     FIT, VAL = "#e2e2e2", J_PRED
 
-    fig, ax = plt.subplots(figsize=(7.4, 2.05))
+    # Only the bars are drawn here.  The heading, the colour key
+    # and the footnote are PowerPoint text boxes placed by
+    # make_measurement_slide.py, so they can be edited or deleted
+    # on the slide without regenerating a figure.
+    fig, ax = plt.subplots(figsize=(7.4, 1.30))
     ax.set_xlim(0, N_TOTAL)
-    ax.set_ylim(0.21, 1.02)
+    ax.set_ylim(0.22, 0.88)
     ax.axis("off")
 
     def bar(x0, w, y, h, fc):
         ax.add_patch(plt.Rectangle((x0, y), w, h, facecolor=fc,
                                    edgecolor="#444444", linewidth=0.9))
-
-    ax.text(n_pool / 2, 0.95,
-            f"{N_TOTAL} simulated devices — split ONCE, BY DEVICE, "
-            "with a fixed seed", ha="center", va="center", fontsize=10.5,
-            color=INK)
 
     # ── level 1: the split that is stored with the device pool ───────────
     bar(0, n_pool, 0.63, 0.22, POOL)
@@ -912,19 +918,5 @@ def fig_data_split():
             va="center", fontsize=9, color="white", fontweight="bold",
             linespacing=1.2)
 
-    # ── what each block is allowed to decide, as a key so nothing collides
-    for xf, sw, txt, col in (
-            (0.005, FIT, "gradient descent", INK),
-            (0.265, VAL, "picks the EPOCH and the THRESHOLD", J_PRED),
-            (0.700, TEST, "the reported numbers, touched once", INK)):
-        fig.patches.append(plt.Rectangle(
-            (xf, 0.085), 0.014, 0.050, facecolor=sw, edgecolor="#444444",
-            linewidth=0.7, transform=fig.transFigure, figure=fig))
-        fig.text(xf + 0.022, 0.110, txt, va="center", fontsize=9,
-                 color=col, fontweight="bold" if col == J_PRED else "normal")
-
-    fig.text(0.5, 0.018,
-             "no device appears in two blocks, at any measurement budget",
-             ha="center", fontsize=8.8, color=MUT)
-    fig.tight_layout(rect=(0, 0.19, 1, 1))
+    fig.tight_layout(pad=0.2)
     save(fig, "fig_data_split")

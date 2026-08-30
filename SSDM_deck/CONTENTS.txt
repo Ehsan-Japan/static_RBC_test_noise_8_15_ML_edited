@@ -80,6 +80,12 @@ slide  7  Ray-based measurement
                                         two-row dataset table, which never
                                         showed the 75 validation devices
                                         the threshold is chosen on.
+                                        THE BARS ONLY — the heading, the
+                                        colour key and the footnote are real
+                                        PowerPoint text boxes and swatches,
+                                        placed by make_measurement_slide.py,
+                                        so they can be reworded or deleted
+                                        without touching the figure.
 
 slide  8  Our model
           01_panel_channel1.png  (+ pdf)
@@ -127,7 +133,10 @@ slide  9  From probability to lines
 
 slide 10  Results
           results_f1_vs_coverage.png  (+ pdf)  ON THE SLIDE — the 15 budgets
-                                      grouped into one line per ray count
+                                      grouped into one line per ray count.
+                                      Its two title lines are a PowerPoint
+                                      text box (make_slide_pictures.py), not
+                                      part of the PNG.
           01_02_f1_vs_coverage.png    the old gallery version, replaced: it
                                       labelled all 15 points and the labels
                                       collided
