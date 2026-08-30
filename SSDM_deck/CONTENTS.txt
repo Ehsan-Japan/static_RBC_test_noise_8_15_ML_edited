@@ -4,14 +4,33 @@ THE DECK IS THE ONE AT THE PROJECT ROOT,
 SSDMpresentation_Ehsan_2026.pptx.  The copy in this folder is a
 mirror, rewritten by the build scripts; never edit it directly.
 
-Build scripts here:
-  make_slide8_text.py       rewrites the caption under slide 8's diagram
-  make_slide9.py            rebuilds slide 9 from the p2l_* panels
-  make_slide_pictures.py    swaps slide 8's probability panel and
-                            slide 10's chart for rebuilt versions
-  make_notes.py             writes the speaker notes of all 11 slides
-  make_slide9_explainer.py  writes slide_09_explainer.pdf
-Panels come from  python paper_figures/make_figures.py.
+Build scripts here — run them all with:
+  python SSDM_deck/build_deck.py
+  deck_common.py            shared paths + find_slide(): the scripts locate
+                            slides BY TITLE, never by index, because the
+                            deck gained a slide at position 3
+  make_intro_slides.py      copies slide 3 of the SSDM 2024 deck (quantum
+                            dots as a qubit platform, with its notes) in
+                            front of the problem slide, then normalises the
+                            two titles: the pasted one loses its explicit
+                            32 pt for a clone of a normal title box, and the
+                            problem slide stops being a second
+                            "Introduction".  Idempotent.
+  make_measurement_slide.py            "Ray-based measurement": panel +
+                            fig_data_split
+  make_model_caption.py       the caption under "Our model"
+  make_probability_slide.py            "From probability to lines", from the
+                            p2l_* panels
+  make_slide_pictures.py    "Our model" probability panel and the
+                            "Results" chart
+  make_notes.py             speaker notes on all 12 slides,
+                            checked against each slide's title
+  make_pdf.py               ALWAYS LAST — writes, next to the deck,
+                            SSDMpresentation_Ehsan_2026.pdf (slides) and
+                            ..._notes.pdf (slide + its notes, for rehearsal)
+  make_probability_explainer.py  writes explainer_probability_to_lines.pdf
+Figures come from  python paper_figures/make_figures.py  and are NOT
+rebuilt by build_deck.py.
 Images are extracted from the .pptx itself, so they are exactly
 what each slide shows.  Where a vector version of the same
 figure exists it is copied alongside as .pdf.
@@ -20,7 +39,11 @@ slide  1  Ray-Based Reconstruction of Charge Stability Diagrams with a Probabili
           01_image1.png
           02_image2.png
 
-slide  3  Introduction
+slide  3  Introduction — gate-defined quantum dots as a qubit platform.
+          Copied verbatim from SSDMpresentation_Ehsan.pptx (SSDM 2024),
+          pictures and speaker notes included; no images extracted here.
+
+slide  4  The problem: measuring the charge stability diagram
           01_pick_stability.png  (+ pdf)
 
 slide  4  Previous work
@@ -38,6 +61,11 @@ slide  6  Device simulation: QArray
 
 slide  7  Ray-based measurement
           01_fig_measurement_panel.png  (+ pdf)
+          fig_data_split.png  (+ pdf)   the 550 devices as 425 fit / 75
+                                        validation / 50 test.  Replaced the
+                                        two-row dataset table, which never
+                                        showed the 75 validation devices
+                                        the threshold is chosen on.
 
 slide  8  Our model
           01_panel_channel1.png  (+ pdf)
