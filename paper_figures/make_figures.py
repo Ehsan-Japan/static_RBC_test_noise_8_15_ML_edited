@@ -748,7 +748,7 @@ def fig_probability_panels(ladder=LADDER, taus=(0, 1, 3)):
     # 9 — the point of the whole slide, zoomed until pixels are visible:
     #     the band grows with tau, the black and the red never move
     r0, c0, S = 30, 26, 40
-    fig, axes = plt.subplots(1, 4, figsize=(9.0, 2.55))
+    fig, axes = plt.subplots(1, 4, figsize=(9.0, 3.00))
     for ax, tau in zip(axes, (0, 1, 2, 3)):
         ax.imshow(overlay(pred, float(tau))[r0:r0 + S, c0:c0 + S],
                   origin="lower", interpolation="nearest")
@@ -762,8 +762,21 @@ def fig_probability_panels(ladder=LADDER, taus=(0, 1, 3)):
             sp.set_color(J_PRED if tau == 1 else "#777777")
             sp.set_linewidth(1.8 if tau == 1 else 0.8)
     fig.suptitle("Same truth, same output — only the tolerance band grows",
-                 fontsize=14, color=INK, y=1.03)
-    fig.tight_layout()
+                 fontsize=14, color=INK, y=0.985)
+    # the colour key rides inside this figure, so the slide does not need a
+    # separate legend strip and the panels can be larger
+    fig.tight_layout(rect=(0, 0.105, 1, 0.945))
+    for x, txt, swatch, tcol in (
+            (0.030, "ground truth — the real transition line",
+             J_TRUTH, J_TRUTH),
+            (0.375, "model output — after the P > 0.4 cut", J_PRED, J_PRED),
+            (0.700, "τ band — within τ pixels of the truth", "#D9D9D9", INK)):
+        fig.patches.append(plt.Rectangle(
+            (x, 0.030), 0.0125, 0.042, facecolor=swatch,
+            edgecolor="#888888", linewidth=0.6,
+            transform=fig.transFigure, figure=fig))
+        fig.text(x + 0.020, 0.051, txt, va="center", fontsize=10.5,
+                 color=tcol, fontweight="bold")
     save(fig, "p2l_9_tau_zoom")
 
     print(f"  threshold {thr:g}")

@@ -51,17 +51,27 @@ slide  9  From probability to lines
           p2l_4_tau0.png              same prediction scored at tau = 0
           p2l_5_tau1.png              ... at tau = 1  (the headline)
           p2l_6_tau3.png              ... at tau = 3
-          p2l_7_tolerance_curve.png   F1 vs tau, 50 held-out devices
-          p2l_8_legend.png            the found / missed / false colour key
+                                      (4/5/6 are full-size versions of the
+                                       tau panels; the SLIDE uses p2l_9,
+                                       because at 100 x 100 the band is one
+                                       pixel and cannot be seen)
+          p2l_7_tolerance_curve.png   F1 / precision / recall vs tau,
+                                      50 held-out devices
+          p2l_8_legend.png            the truth / output / band colour key
+          p2l_9_tau_zoom.png          THE tau figure: one junction at
+                                      tau = 0, 1, 2, 3, zoomed to pixels
           (each + pdf; regenerate with
            python paper_figures/make_figures.py -> fig_probability_panels)
 
-          Journal palette, on white:  black = found (a predicted line that
-          really is there), red = missed (a real line not drawn), blue =
-          false (a line drawn where there is none).  The probability map
-          uses a white-to-blue sequential.  Axes are the device's real gate
-          window, V1 -1.0 .. -0.2 mV and V2 -0.4 .. 0.4 mV, with a dotted
-          grid drawn over the image.
+          TWO colours on white, plus a band:
+            black  the ground truth transition line (1 px wide)
+            red    the model's output, after the P > 0.4 cut
+            grey   the tolerance band, every pixel within tau of the truth
+          The band is what makes tau visible.  tau is symmetric: precision
+          dilates the TRUTH, recall dilates the PREDICTION; the drawn band
+          is the precision side.  The probability map uses a white-to-blue
+          sequential.  Axes are the device's real gate window, V1 -1.0 ..
+          -0.2 mV and V2 -0.4 .. 0.4 mV, with a dotted grid over the image.
           NOTE 01_fig_probability_to_lines.* is the OLD merged figure and
           still carries the old teal/red/plum deck palette.
 
