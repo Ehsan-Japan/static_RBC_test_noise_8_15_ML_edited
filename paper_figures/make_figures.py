@@ -568,6 +568,7 @@ if __name__ == "__main__":
     fig_probability_panels()
     fig_results_f1_vs_coverage()
     fig_data_split()
+    fig_tau_metrics()
     fig_model_flow()
     fig_panels()
     fig_charge_sensor()
@@ -920,3 +921,60 @@ def fig_data_split():
 
     fig.tight_layout(pad=0.2)
     save(fig, "fig_data_split")
+
+
+# ── figure 11: every metric against tolerance, three budgets ──────────────
+# The gallery version (figures/40_tau_all_metrics.png) draws all fifteen
+# budgets and four metrics: sixteen indistinguishable lines per panel.  This
+# keeps the smallest budget, a middle one and the best, and drops the pixel
+# accuracy panel — accuracy is high whatever the model does, which is a point
+# to make out loud, not a panel to squint at.
+def fig_tau_metrics(budgets=((4, 40), (6, 50), (8, 60))):
+    import csv
+
+    with open(os.path.join(RUN_DIR, "comparison.csv"), newline="") as fh:
+        rows = {(int(r["n_rays"]), int(r["n_points"])): r
+                for r in csv.DictReader(fh)}
+
+    STYLE = {4: ("#9ECAE1", "o"), 5: ("#4292C6", "s"), 6: ("#08519C", "^"),
+             7: ("#000000", "D"), 8: (J_PRED, "o")}
+    T = (0, 1, 2, 3)
+    METRICS = (("f1", "F1"), ("precision", "precision"), ("recall", "recall"))
+
+    fig, axes = plt.subplots(1, 3, figsize=(9.2, 2.15), sharey=True)
+    for ax, (key, label) in zip(axes, METRICS):
+        for n_rays, n_pts in budgets:
+            r = rows[(n_rays, n_pts)]
+            y = [float(r[f"{key}@{t}"]) for t in T]
+            colour, marker = STYLE[n_rays]
+            best = (n_rays, n_pts) == max(budgets)
+            ax.plot(T, y, marker=marker, linestyle="-", color=colour,
+                    linewidth=2.0 if best else 1.4,
+                    markersize=5.5 if best else 4.5,
+                    markeredgecolor="white" if best else colour,
+                    markeredgewidth=0.8 if best else 0.6,
+                    zorder=4 if best else 2,
+                    label=f"{n_rays} × {n_pts}   "
+                          f"({100 * float(r['coverage']):.1f} %)")
+        ax.set_title(label, fontsize=10.5, color=INK, pad=5, loc="left")
+        ax.set_xlabel("tolerance τ  (pixels)", fontsize=9.5, color=INK)
+        ax.set_xticks(list(T))
+        ax.set_ylim(0.25, 1.02)
+        ax.tick_params(labelsize=8.5, colors=INK)
+        ax.grid(True, color=J_GRID, linewidth=0.5, linestyle=(0, (1, 3)),
+                alpha=0.85)
+        ax.set_axisbelow(True)
+        for sp in ("top", "right"):
+            ax.spines[sp].set_visible(False)
+        for sp in ("left", "bottom"):
+            ax.spines[sp].set_color("#444444")
+            ax.spines[sp].set_linewidth(0.8)
+
+    axes[0].set_ylabel("score on 50\nheld-out devices", fontsize=9,
+                       color=INK, linespacing=1.3)
+    axes[0].legend(fontsize=8, frameon=True, framealpha=0.92,
+                   edgecolor="#cccccc", loc="lower right", handlelength=1.8,
+                   labelspacing=0.3, borderpad=0.3,
+                   title="rays × points  (coverage)", title_fontsize=8)
+    fig.tight_layout(pad=0.6, w_pad=1.4)
+    save(fig, "fig_tau_metrics")

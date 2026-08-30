@@ -137,6 +137,15 @@ slide 10  Results
                                       Its two title lines are a PowerPoint
                                       text box (make_slide_pictures.py), not
                                       part of the PNG.
+          fig_tau_metrics.png  (+ pdf)  F1 / precision / recall against tau
+                                      for THREE budgets (4x40, 6x50, 8x60).
+                                      A filtered stand-in for the gallery's
+                                      40_tau_all_metrics.png, which draws
+                                      all 15 budgets and 4 metrics — sixteen
+                                      indistinguishable lines per panel.
+                                      Pixel accuracy is dropped: it is >0.9
+                                      whatever the model does, a point to
+                                      make out loud rather than plot.
           01_02_f1_vs_coverage.png    the old gallery version, replaced: it
                                       labelled all 15 points and the labels
                                       collided
