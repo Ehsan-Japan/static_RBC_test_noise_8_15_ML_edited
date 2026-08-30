@@ -4,6 +4,12 @@ THE DECK IS THE ONE AT THE PROJECT ROOT,
 SSDMpresentation_Ehsan_2026.pptx.  The copy in this folder is a
 mirror, rewritten by the build scripts; never edit it directly.
 
+Folder names carry the slide number, so they go stale whenever a slide is
+inserted or retitled.  rename_slide_folders.py derives the right names from
+the deck itself:
+  python SSDM_deck/rename_slide_folders.py            # show the plan
+  python SSDM_deck/rename_slide_folders.py --apply    # do it
+
 Build scripts here — run them all with:
   python SSDM_deck/build_deck.py
   deck_common.py            shared paths + find_slide(): the scripts locate
@@ -44,7 +50,12 @@ slide  3  Introduction — gate-defined quantum dots as a qubit platform.
           pictures and speaker notes included; no images extracted here.
 
 slide  4  The problem: measuring the charge stability diagram
-          01_pick_stability.png  (+ pdf)
+          01_charge_stability_diagram.png   a MEASURED diagram; the source
+                                            is SSDM_deck/charge_stability_
+                                            diagram.png, where
+                                            make_slide_pictures.py reads it
+          (replaced 01_pick_stability.png, the simulated sketch, and the
+           caption "the lines are what define the charge configuration")
 
 slide  4  Previous work
           01_V. Hernandes et al_image1.png
