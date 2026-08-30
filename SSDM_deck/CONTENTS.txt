@@ -5,6 +5,7 @@ SSDMpresentation_Ehsan_2026.pptx.  The copy in this folder is a
 mirror, rewritten by the build scripts; never edit it directly.
 
 Build scripts here:
+  make_slide8_text.py       rewrites the caption under slide 8's diagram
   make_slide9.py            rebuilds slide 9 from the p2l_* panels
   make_notes.py             writes the speaker notes of all 11 slides
   make_slide9_explainer.py  writes slide_09_explainer.pdf
@@ -57,7 +58,9 @@ slide  9  From probability to lines
                                        pixel and cannot be seen)
           p2l_7_tolerance_curve.png   F1 / precision / recall vs tau,
                                       50 held-out devices
-          p2l_8_legend.png            the truth / output / band colour key
+          p2l_8_legend.png            standalone colour key — NOT on the
+                                      slide any more; the key is drawn
+                                      inside p2l_9 itself
           p2l_9_tau_zoom.png          THE tau figure: one junction at
                                       tau = 0, 1, 2, 3, zoomed to pixels
           (each + pdf; regenerate with

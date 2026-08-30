@@ -471,10 +471,10 @@ def fig_panels(device_index=RESULT_DEVICE):
                                vmin=0, vmax=1, interpolation="nearest"),
           f"channel 2\nvisited mask ({100 * vis.mean():.1f} % of the grid)",
           "panel_channel2")
-    panel(lambda ax: ax.imshow(prob, origin="lower", cmap="magma", vmin=0,
+    panel(lambda ax: ax.imshow(prob, origin="lower", cmap=J_CMAP, vmin=0,
                                vmax=1, interpolation="nearest"),
           "output\nP(transition line) per pixel", "panel_probability",
-          colour="#7d2b3a", cbar=True)
+          cbar=True)
 
 
 # ── figure 6: the charge sensor, raw and with its background removed ──────
@@ -566,6 +566,7 @@ if __name__ == "__main__":
     fig_unet()
     fig_probability_to_lines(RESULT_DEVICE)
     fig_probability_panels()
+    fig_results_f1_vs_coverage()
     fig_model_flow()
     fig_panels()
     fig_charge_sensor()
@@ -784,3 +785,67 @@ def fig_probability_panels(ladder=LADDER, taus=(0, 1, 3)):
     print("  F1:         " + "  ".join(f"{v:.3f}" for v in f1s))
     print("  precision:  " + "  ".join(f"{v:.3f}" for v in prs))
     print("  recall:     " + "  ".join(f"{v:.3f}" for v in rcs))
+
+
+# ── figure 9: the results chart for the slide ─────────────────────────────
+# The gallery version labels all fifteen points and the labels collide.  Here
+# the budgets are GROUPED BY RAY COUNT — one line each — so the reading
+# "more rays beats more points at the same coverage" is the shape of the
+# plot rather than something the caption has to assert.
+def fig_results_f1_vs_coverage():
+    import csv
+
+    with open(os.path.join(RUN_DIR, "comparison.csv"), newline="") as fh:
+        rows = list(csv.DictReader(fh))
+    by_rays = {}
+    for r in rows:
+        by_rays.setdefault(int(r["n_rays"]), []).append(
+            (100.0 * float(r["coverage"]), float(r["f1@1"]),
+             int(r["n_points"])))
+    for v in by_rays.values():
+        v.sort()
+
+    fig, ax = plt.subplots(figsize=(5.6, 3.7))
+    greys = {4: "#b4b4b4", 5: "#8e8e8e", 6: "#6a6a6a", 7: "#454545"}
+    for n in sorted(by_rays):
+        x = [c for c, _f, _p in by_rays[n]]
+        y = [f for _c, f, _p in by_rays[n]]
+        best = n == max(by_rays)
+        ax.plot(x, y, "-o", color=J_PRED if best else greys[n],
+                linewidth=2.0 if best else 1.2,
+                markersize=5.5 if best else 4.2, zorder=4 if best else 2,
+                label=f"{n} rays")
+
+    # the honest comparison: same coverage, more rays
+    ax.annotate("", xy=(2.33, 0.752), xytext=(2.35, 0.691),
+                arrowprops=dict(arrowstyle="-|>", color=J_TRUTH,
+                                linewidth=1.2, shrinkA=3, shrinkB=3))
+    ax.text(2.45, 0.719, "same coverage,\nmore rays", fontsize=8.5,
+            color=J_TRUTH, va="center")
+
+    ax.annotate("8 × 60\nF1 0.849 at 4.7 %", xy=(4.66, 0.849),
+                xytext=(3.95, 0.885), fontsize=9, color=J_PRED,
+                fontweight="bold", ha="center",
+                arrowprops=dict(arrowstyle="-", color=J_PRED, linewidth=0.9))
+
+    ax.set_xlabel("fraction of the grid measured  (%)", fontsize=10.5,
+                  color=INK)
+    ax.set_ylabel("F1 @ 1 px tolerance", fontsize=10.5, color=INK)
+    ax.set_xlim(1.2, 5.1)
+    ax.set_ylim(0.63, 0.91)
+    ax.tick_params(labelsize=9, colors=INK)
+    ax.grid(True, color=J_GRID, linewidth=0.5, linestyle=(0, (1, 3)),
+            alpha=0.85)
+    ax.set_axisbelow(True)
+    ax.legend(fontsize=8.5, frameon=False, loc="lower right",
+              handlelength=1.8, labelspacing=0.3, borderpad=0.2)
+    for sp in ("top", "right"):
+        ax.spines[sp].set_visible(False)
+    for sp in ("left", "bottom"):
+        ax.spines[sp].set_color("#444444"); ax.spines[sp].set_linewidth(0.8)
+    ax.set_title("Accuracy against measurement cost\n"
+                 "each line is one ray count; the three points on it are "
+                 "40, 50, 60 points per ray",
+                 fontsize=10.5, color=INK, pad=8, loc="left")
+    fig.tight_layout()
+    save(fig, "results_f1_vs_coverage")
