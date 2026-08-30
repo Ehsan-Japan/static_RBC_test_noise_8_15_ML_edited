@@ -870,9 +870,9 @@ def fig_data_split():
     POOL, TEST = "#c8c8c8", "#1a1a1a"
     FIT, VAL = "#e2e2e2", J_PRED
 
-    fig, ax = plt.subplots(figsize=(7.4, 2.45))
+    fig, ax = plt.subplots(figsize=(7.4, 2.05))
     ax.set_xlim(0, N_TOTAL)
-    ax.set_ylim(0, 1)
+    ax.set_ylim(0.21, 1.02)
     ax.axis("off")
 
     def bar(x0, w, y, h, fc):
@@ -889,8 +889,7 @@ def fig_data_split():
     bar(n_pool, N_TEST, 0.63, 0.22, TEST)
     ax.text(n_pool / 2, 0.74, f"{n_pool} training devices", ha="center",
             va="center", fontsize=11, color=INK, fontweight="bold")
-    ax.text(n_pool + N_TEST / 2, 0.74, f"{N_TEST}
-test", ha="center",
+    ax.text(n_pool + N_TEST / 2, 0.74, f"{N_TEST}" + chr(10) + "test", ha="center",
             va="center", fontsize=9, color="white", fontweight="bold",
             linespacing=1.2)
 
@@ -909,8 +908,7 @@ test", ha="center",
     bar(n_fit, n_val, 0.26, 0.22, VAL)
     ax.text(n_fit / 2, 0.37, f"{n_fit}  fit the weights", ha="center",
             va="center", fontsize=11, color=INK, fontweight="bold")
-    ax.text(n_fit + n_val / 2, 0.37, f"{n_val}
-validation", ha="center",
+    ax.text(n_fit + n_val / 2, 0.37, f"{n_val}" + chr(10) + "validation", ha="center",
             va="center", fontsize=9, color="white", fontweight="bold",
             linespacing=1.2)
 
@@ -928,5 +926,5 @@ validation", ha="center",
     fig.text(0.5, 0.018,
              "no device appears in two blocks, at any measurement budget",
              ha="center", fontsize=8.8, color=MUT)
-    fig.tight_layout(rect=(0, 0.16, 1, 1))
+    fig.tight_layout(rect=(0, 0.19, 1, 1))
     save(fig, "fig_data_split")
