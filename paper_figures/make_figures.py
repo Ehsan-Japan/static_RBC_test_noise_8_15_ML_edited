@@ -295,7 +295,7 @@ def fig_probability_to_lines(device_index=RESULT_DEVICE, ladder=LADDER):
             sp.set_color("#999999")
 
     def err_rgb(pred, tau):
-        """green = hit within tau, blue = missed line, orange = false line."""
+        """teal = found within tau, red = missed line, plum = false line."""
         if tau not in d_true_by_tau:
             d_true_by_tau[tau] = (distance_transform_edt(~truth)
                                   if truth.any()
@@ -565,7 +565,168 @@ if __name__ == "__main__":
     fig_network_input(compact=True)
     fig_unet()
     fig_probability_to_lines(RESULT_DEVICE)
+    fig_probability_panels()
     fig_model_flow()
     fig_panels()
     fig_charge_sensor()
     fig_measurement_panel()
+
+
+
+
+# ── figure 8: slide 9 / manuscript, one file per panel ────────────────────
+# Journal palette, not the deck's: black / red / blue on white, a white-to-
+# blue sequential for the probability, and real gate-voltage axes with a
+# grid instead of a bare framed bitmap.  Each panel is its own file so a
+# figure (or a slide) can lay them out itself.
+J_HIT, J_MISS, J_FALSE = "#000000", "#C00000", "#1F4E9C"   # found / missed / false
+J_HIT_RGB = (0.000, 0.000, 0.000)
+J_MISS_RGB = (0.753, 0.000, 0.000)
+J_FALSE_RGB = (0.122, 0.306, 0.612)
+J_CMAP = "Blues"                     # white = P 0, dark blue = P 1
+J_GRID = "#9a9a9a"
+
+
+def fig_probability_panels(ladder=LADDER, taus=(0, 1, 3)):
+    import csv
+
+    from dqd.ml import grid_train
+    from dqd.ml.grid_metrics import tolerant_f1
+    from scipy.ndimage import distance_transform_edt
+
+    cfg_dir = os.path.join(RUN_DIR, CONFIG)
+    net, ck = grid_train.load(os.path.join(cfg_dir, "model", "unet.pt"))
+    thr = float(ck["threshold"])
+    _ch, Yt, p = pick_case(net)
+    truth = Yt > 0.5
+    d_true = (distance_transform_edt(~truth) if truth.any()
+              else np.full(truth.shape, np.inf))
+
+    # real gate voltages, so the panels carry axes rather than pixel indices
+    ux, uy, _Z = ray_peaks.load_grid(PICK)
+    ext = [ux.min(), ux.max(), uy.min(), uy.max()]
+
+    def err_rgb(pred, tau):
+        """black = found within tau, red = missed line, blue = false line."""
+        dp = (distance_transform_edt(~pred) if pred.any()
+              else np.full(pred.shape, np.inf))
+        rgb = np.ones(truth.shape + (3,))
+        rgb[pred & (d_true > tau)] = J_FALSE_RGB
+        rgb[truth & (dp > tau)] = J_MISS_RGB
+        rgb[pred & (d_true <= tau)] = J_HIT_RGB
+        return rgb
+
+    def axes_style(ax, ylab=True):
+        ax.set_xlabel("$V_1$ (mV)", fontsize=9, color=INK, labelpad=2)
+        ax.set_ylabel("$V_2$ (mV)" if ylab else "", fontsize=9, color=INK,
+                      labelpad=2)
+        ax.tick_params(labelsize=7.5, length=3, width=0.7, direction="out",
+                       colors=INK)
+        ax.set_xticks(np.round(np.linspace(ext[0], ext[1], 5), 2))
+        ax.set_yticks(np.round(np.linspace(ext[2], ext[3], 5), 2))
+        # the grid sits ON TOP of the image, so it has to be thin and light
+        ax.grid(True, which="major", color=J_GRID, linewidth=0.5,
+                linestyle=(0, (1, 3)), alpha=0.85)
+        ax.set_axisbelow(False)
+        for sp in ax.spines.values():
+            sp.set_color("#444444")
+            sp.set_linewidth(0.8)
+
+    def panel(name, draw, title, colour=INK, boxed=None, cbar=False):
+        fig, ax = plt.subplots(figsize=(2.55, 2.85))
+        im = draw(ax)
+        ax.set_title(title, fontsize=10.5, color=colour, pad=6,
+                     fontweight="bold" if boxed else "normal")
+        axes_style(ax)
+        if boxed:
+            for sp in ax.spines.values():
+                sp.set_color(boxed); sp.set_linewidth(2.2)
+        if cbar:
+            cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
+            cb.ax.tick_params(labelsize=7.5)
+            cb.outline.set_linewidth(0.6)
+        fig.tight_layout()
+        save(fig, name)
+
+    # 1 — the raw probability map
+    panel("p2l_1_probability",
+          lambda ax: ax.imshow(p, origin="lower", cmap=J_CMAP, vmin=0,
+                               vmax=1, extent=ext, aspect="auto",
+                               interpolation="nearest"),
+          "U-Net output\n$P$(transition line)", cbar=True)
+
+    # 2, 3 — the same map cut at two thresholds, scored at tau = 1
+    for k, t in enumerate(ladder):
+        pred = p > t
+        f1 = tolerant_f1(pred, Yt, 1.0)["f1"]
+        chosen = abs(t - thr) < 1e-9
+        panel(f"p2l_{2 + k}_threshold_{t:g}".replace(".", "p"),
+              lambda ax, pr=pred: ax.imshow(err_rgb(pr, 1.0), origin="lower",
+                                            extent=ext, aspect="auto",
+                                            interpolation="nearest"),
+              f"$P$ > {t:g}" + ("  (chosen)" if chosen else "") +
+              f"\nF1@1 = {f1:.3f}",
+              colour=J_MISS if chosen else INK,
+              boxed=J_MISS if chosen else None)
+
+    # 4, 5, 6 — ONE prediction (the chosen cut), scored at three tolerances
+    pred = p > thr
+    for k, tau in enumerate(taus):
+        f1 = tolerant_f1(pred, Yt, float(tau))["f1"]
+        head = "τ = 0  (strict)" if tau == 0 else f"τ = {tau}"
+        panel(f"p2l_{4 + k}_tau{tau}",
+              lambda ax, tt=tau: ax.imshow(err_rgb(pred, float(tt)),
+                                           origin="lower", extent=ext,
+                                           aspect="auto",
+                                           interpolation="nearest"),
+              f"{head}\nF1@{tau} = {f1:.3f}",
+              colour=J_FALSE if tau == 1 else INK,
+              boxed=J_FALSE if tau == 1 else None)
+
+    # 7 — why tau = 1: the tolerance curve on the 50 held-out devices
+    with open(os.path.join(RUN_DIR, "comparison.csv"), newline="") as fh:
+        row = next(r for r in csv.DictReader(fh)
+                   if r["configuration"] == CONFIG)
+    f1s = [float(row[f"f1@{t}"]) for t in (0, 1, 2, 3)]
+    fig, ax = plt.subplots(figsize=(3.35, 2.85))
+    ax.plot([0, 1, 2, 3], f1s, "-o", color=J_HIT, linewidth=1.6,
+            markersize=5, zorder=3)
+    ax.plot([1], [f1s[1]], "o", color=J_FALSE, markersize=12,
+            markerfacecolor="none", markeredgewidth=1.8, zorder=4)
+    for x, y in zip((0, 1, 2, 3), f1s):
+        off, ha = ((13, -4), "left") if x == 0 else ((0, -16), "center")
+        ax.annotate(f"{y:.3f}", (x, y), textcoords="offset points",
+                    xytext=off, ha=ha, fontsize=8.5,
+                    color=J_FALSE if x == 1 else INK)
+    ax.set_xticks([0, 1, 2, 3])
+    ax.set_ylim(0.30, 1.02)
+    ax.set_xlabel("tolerance τ  (pixels)", fontsize=9.5, color=INK)
+    ax.set_ylabel("F1 on 50 held-out devices", fontsize=9.5, color=INK)
+    ax.set_title("τ = 0 → 1 is the big jump;\nbeyond that the curve "
+                 "flattens", fontsize=10, color=INK, pad=6)
+    ax.tick_params(labelsize=8.5, colors=INK)
+    ax.grid(True, color=J_GRID, linewidth=0.5, linestyle=(0, (1, 3)),
+            alpha=0.85)
+    ax.set_axisbelow(True)
+    for sp in ("top", "right"):
+        ax.spines[sp].set_visible(False)
+    for sp in ("left", "bottom"):
+        ax.spines[sp].set_color("#444444"); ax.spines[sp].set_linewidth(0.8)
+    fig.tight_layout()
+    save(fig, "p2l_7_tolerance_curve")
+
+    # 8 — the colour key on its own
+    fig, ax = plt.subplots(figsize=(9.0, 0.40))
+    ax.axis("off")
+    for x, txt, col in (
+            (0.000, "found — a line that really is there", J_HIT),
+            (0.365, "missed — a real line not drawn", J_MISS),
+            (0.705, "false — a line where there is none", J_FALSE)):
+        ax.add_patch(plt.Rectangle((x, 0.34), 0.013, 0.34, color=col,
+                                   transform=ax.transAxes, clip_on=False))
+        ax.text(x + 0.021, 0.5, txt, transform=ax.transAxes, va="center",
+                fontsize=10.5, color=col, fontweight="bold")
+    save(fig, "p2l_8_legend")
+
+    print(f"  threshold {thr:g}   F1@tau on test: "
+          + ", ".join(f"{t}:{v:.3f}" for t, v in zip((0, 1, 2, 3), f1s)))

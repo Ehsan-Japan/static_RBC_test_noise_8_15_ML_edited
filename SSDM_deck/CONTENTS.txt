@@ -33,7 +33,27 @@ slide  8  Our model
           04_panel_probability.png  (+ pdf)
 
 slide  9  From probability to lines
-          01_fig_probability_to_lines.png  (+ pdf)
+          01_fig_probability_to_lines.png  (+ pdf)   the old merged figure,
+                                                     no longer on the slide
+          p2l_1_probability.png       U-Net output, P(transition line)
+          p2l_2_threshold_0p4.png     cut at P > 0.4  (the chosen threshold)
+          p2l_3_threshold_0p9.png     cut at P > 0.9
+          p2l_4_tau0.png              same prediction scored at tau = 0
+          p2l_5_tau1.png              ... at tau = 1  (the headline)
+          p2l_6_tau3.png              ... at tau = 3
+          p2l_7_tolerance_curve.png   F1 vs tau, 50 held-out devices
+          p2l_8_legend.png            the found / missed / false colour key
+          (each + pdf; regenerate with
+           python paper_figures/make_figures.py -> fig_probability_panels)
+
+          Journal palette, on white:  black = found (a predicted line that
+          really is there), red = missed (a real line not drawn), blue =
+          false (a line drawn where there is none).  The probability map
+          uses a white-to-blue sequential.  Axes are the device's real gate
+          window, V1 -1.0 .. -0.2 mV and V2 -0.4 .. 0.4 mV, with a dotted
+          grid drawn over the image.
+          NOTE 01_fig_probability_to_lines.* is the OLD merged figure and
+          still carries the old teal/red/plum deck palette.
 
 slide 10  Results
           01_02_f1_vs_coverage.png
