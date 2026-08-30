@@ -50,9 +50,12 @@ slide  3  Introduction — gate-defined quantum dots as a qubit platform.
           pictures and speaker notes included; no images extracted here.
 
 slide  4  The problem: measuring the charge stability diagram
-          01_charge_stability_diagram.png   a MEASURED diagram; the source
-                                            is SSDM_deck/charge_stability_
-                                            diagram.png, where
+          01_charge_stability_diagram.png   a MEASURED diagram, credited on
+                                            the slide to W. I. L. Lawrie et
+                                            al., Appl. Phys. Lett. 116,
+                                            080501 (2020) — NOT our data.
+                                            Source file is SSDM_deck/charge_
+                                            stability_diagram.png, where
                                             make_slide_pictures.py reads it
           (replaced 01_pick_stability.png, the simulated sketch, and the
            caption "the lines are what define the charge configuration")
