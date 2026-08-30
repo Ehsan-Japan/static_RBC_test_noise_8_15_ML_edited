@@ -7,6 +7,8 @@ mirror, rewritten by the build scripts; never edit it directly.
 Build scripts here:
   make_slide8_text.py       rewrites the caption under slide 8's diagram
   make_slide9.py            rebuilds slide 9 from the p2l_* panels
+  make_slide_pictures.py    swaps slide 8's probability panel and
+                            slide 10's chart for rebuilt versions
   make_notes.py             writes the speaker notes of all 11 slides
   make_slide9_explainer.py  writes slide_09_explainer.pdf
 Panels come from  python paper_figures/make_figures.py.
@@ -42,6 +44,9 @@ slide  8  Our model
           02_panel_channel2.png  (+ pdf)
           03_fig_unet.png  (+ pdf)
           04_panel_probability.png  (+ pdf)
+          The probability panel uses magma, the SAME map as slide 9's
+          p2l_1_probability.  Both come from J_CMAP in make_figures.py —
+          change it in one place and rerun both slide scripts.
 
 slide  9  From probability to lines
           01_fig_probability_to_lines.png  (+ pdf)   the old merged figure,
@@ -72,11 +77,15 @@ slide  9  From probability to lines
             grey   the tolerance band, every pixel within tau of the truth
           The band is what makes tau visible.  tau is symmetric: precision
           dilates the TRUTH, recall dilates the PREDICTION; the drawn band
-          is the precision side.  The probability map uses a white-to-blue
-          sequential.  Axes are the device's real gate window, V1 -1.0 ..
+          is the precision side.  The probability map uses magma, the
+          same map as slide 8.  Axes are the device's real gate window, V1 -1.0 ..
           -0.2 mV and V2 -0.4 .. 0.4 mV, with a dotted grid over the image.
           NOTE 01_fig_probability_to_lines.* is the OLD merged figure and
           still carries the old teal/red/plum deck palette.
 
 slide 10  Results
-          01_02_f1_vs_coverage.png
+          results_f1_vs_coverage.png  (+ pdf)  ON THE SLIDE — the 15 budgets
+                                      grouped into one line per ray count
+          01_02_f1_vs_coverage.png    the old gallery version, replaced: it
+                                      labelled all 15 points and the labels
+                                      collided

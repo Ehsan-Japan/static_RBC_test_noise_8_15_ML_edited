@@ -474,7 +474,7 @@ def fig_panels(device_index=RESULT_DEVICE):
     panel(lambda ax: ax.imshow(prob, origin="lower", cmap=J_CMAP, vmin=0,
                                vmax=1, interpolation="nearest"),
           "output\nP(transition line) per pixel", "panel_probability",
-          cbar=True)
+          colour=J_PTITLE, cbar=True)
 
 
 # ── figure 6: the charge sensor, raw and with its background removed ──────
@@ -567,6 +567,7 @@ if __name__ == "__main__":
     fig_probability_to_lines(RESULT_DEVICE)
     fig_probability_panels()
     fig_results_f1_vs_coverage()
+    fig_data_split()
     fig_model_flow()
     fig_panels()
     fig_charge_sensor()
@@ -590,7 +591,8 @@ J_TRUTH, J_PRED, J_BAND = "#000000", "#C00000", "#D9D9D9"
 J_TRUTH_RGB = (0.000, 0.000, 0.000)
 J_PRED_RGB = (0.753, 0.000, 0.000)
 J_BAND_RGB = (0.851, 0.851, 0.851)
-J_CMAP = "Blues"                     # white = P 0, dark blue = P 1
+J_CMAP = "magma"                     # black = P 0, yellow = P 1
+J_PTITLE = "#7d2b3a"                 # probability-panel title
 J_GRID = "#9a9a9a"
 
 
@@ -659,7 +661,7 @@ def fig_probability_panels(ladder=LADDER, taus=(0, 1, 3)):
           lambda ax: ax.imshow(p, origin="lower", cmap=J_CMAP, vmin=0,
                                vmax=1, extent=ext, aspect="auto",
                                interpolation="nearest"),
-          "U-Net output\n$P$(transition line)", cbar=True)
+          "U-Net output\n$P$(transition line)", colour=J_PTITLE, cbar=True)
 
     # 2, 3 — the same map cut at two thresholds, both scored at tau = 1
     for k, t in enumerate(ladder):
@@ -849,3 +851,82 @@ def fig_results_f1_vs_coverage():
                  fontsize=10.5, color=INK, pad=8, loc="left")
     fig.tight_layout()
     save(fig, "results_f1_vs_coverage")
+
+
+# ── figure 10: where the validation devices come from ─────────────────────
+# The dataset table says 500 / 50 and the validation split is invisible in
+# it, which is the one thing a reviewer will ask about: the threshold is a
+# fitted quantity, so WHERE it was fitted has to be on the slide.
+#   550 devices -> 500 training pool + 50 test          (split_seed 12345)
+#   500 pool    -> 425 fit weights + 75 validation      (default_rng(0))
+def fig_data_split():
+    from dqd.ml import grid_train
+
+    N_TOTAL, N_TEST = 550, 50
+    n_pool = N_TOTAL - N_TEST
+    n_val = max(1, int(grid_train.VAL_FRACTION * n_pool))
+    n_fit = n_pool - n_val
+
+    POOL, TEST = "#c8c8c8", "#1a1a1a"
+    FIT, VAL = "#e2e2e2", J_PRED
+
+    fig, ax = plt.subplots(figsize=(7.4, 2.45))
+    ax.set_xlim(0, N_TOTAL)
+    ax.set_ylim(0, 1)
+    ax.axis("off")
+
+    def bar(x0, w, y, h, fc):
+        ax.add_patch(plt.Rectangle((x0, y), w, h, facecolor=fc,
+                                   edgecolor="#444444", linewidth=0.9))
+
+    ax.text(n_pool / 2, 0.95,
+            f"{N_TOTAL} simulated devices — split ONCE, BY DEVICE, "
+            "with a fixed seed", ha="center", va="center", fontsize=10.5,
+            color=INK)
+
+    # ── level 1: the split that is stored with the device pool ───────────
+    bar(0, n_pool, 0.63, 0.22, POOL)
+    bar(n_pool, N_TEST, 0.63, 0.22, TEST)
+    ax.text(n_pool / 2, 0.74, f"{n_pool} training devices", ha="center",
+            va="center", fontsize=11, color=INK, fontweight="bold")
+    ax.text(n_pool + N_TEST / 2, 0.74, f"{N_TEST}
+test", ha="center",
+            va="center", fontsize=9, color="white", fontweight="bold",
+            linespacing=1.2)
+
+    # ── the carve-out, before any training ───────────────────────────────
+    for x in (0, n_pool):
+        ax.plot([x, x], [0.63, 0.52], color="#999999", linewidth=0.8,
+                linestyle=(0, (2, 2)))
+    ax.annotate("", xy=(n_pool / 2, 0.50), xytext=(n_pool / 2, 0.61),
+                arrowprops=dict(arrowstyle="-|>", color="#444444",
+                                linewidth=1.1))
+    ax.text(n_pool / 2 + 10, 0.555, "15 % carved out, before any training",
+            fontsize=8.8, color=MUT, va="center")
+
+    # ── level 2: inside the training devices ─────────────────────────────
+    bar(0, n_fit, 0.26, 0.22, FIT)
+    bar(n_fit, n_val, 0.26, 0.22, VAL)
+    ax.text(n_fit / 2, 0.37, f"{n_fit}  fit the weights", ha="center",
+            va="center", fontsize=11, color=INK, fontweight="bold")
+    ax.text(n_fit + n_val / 2, 0.37, f"{n_val}
+validation", ha="center",
+            va="center", fontsize=9, color="white", fontweight="bold",
+            linespacing=1.2)
+
+    # ── what each block is allowed to decide, as a key so nothing collides
+    for xf, sw, txt, col in (
+            (0.005, FIT, "gradient descent", INK),
+            (0.265, VAL, "picks the EPOCH and the THRESHOLD", J_PRED),
+            (0.700, TEST, "the reported numbers, touched once", INK)):
+        fig.patches.append(plt.Rectangle(
+            (xf, 0.085), 0.014, 0.050, facecolor=sw, edgecolor="#444444",
+            linewidth=0.7, transform=fig.transFigure, figure=fig))
+        fig.text(xf + 0.022, 0.110, txt, va="center", fontsize=9,
+                 color=col, fontweight="bold" if col == J_PRED else "normal")
+
+    fig.text(0.5, 0.018,
+             "no device appears in two blocks, at any measurement budget",
+             ha="center", fontsize=8.8, color=MUT)
+    fig.tight_layout(rect=(0, 0.16, 1, 1))
+    save(fig, "fig_data_split")
