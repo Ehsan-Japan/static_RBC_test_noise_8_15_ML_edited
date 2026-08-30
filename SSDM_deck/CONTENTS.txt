@@ -1,4 +1,14 @@
 Deck and the figures it uses, one folder per slide.
+
+THE DECK IS THE ONE AT THE PROJECT ROOT,
+SSDMpresentation_Ehsan_2026.pptx.  The copy in this folder is a
+mirror, rewritten by the build scripts; never edit it directly.
+
+Build scripts here:
+  make_slide9.py            rebuilds slide 9 from the p2l_* panels
+  make_notes.py             writes the speaker notes of all 11 slides
+  make_slide9_explainer.py  writes slide_09_explainer.pdf
+Panels come from  python paper_figures/make_figures.py.
 Images are extracted from the .pptx itself, so they are exactly
 what each slide shows.  Where a vector version of the same
 figure exists it is copied alongside as .pdf.
