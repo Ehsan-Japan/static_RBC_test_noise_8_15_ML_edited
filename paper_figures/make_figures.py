@@ -572,17 +572,23 @@ if __name__ == "__main__":
     fig_measurement_panel()
 
 
-
-
 # ── figure 8: slide 9 / manuscript, one file per panel ────────────────────
-# Journal palette, not the deck's: black / red / blue on white, a white-to-
-# blue sequential for the probability, and real gate-voltage axes with a
-# grid instead of a bare framed bitmap.  Each panel is its own file so a
-# figure (or a slide) can lay them out itself.
-J_HIT, J_MISS, J_FALSE = "#000000", "#C00000", "#1F4E9C"   # found / missed / false
-J_HIT_RGB = (0.000, 0.000, 0.000)
-J_MISS_RGB = (0.753, 0.000, 0.000)
-J_FALSE_RGB = (0.122, 0.306, 0.612)
+# TWO colours, plus a tolerance band.  The panels answer one question — how
+# close is the model's output to the truth — so they carry exactly the two
+# things being compared:
+#
+#     black  the ground truth transition line (1 pixel wide)
+#     red    the model's output after thresholding
+#     grey   the tolerance band: every pixel within tau of the truth
+#
+# The band is what makes tau visible.  Note that tau is symmetric: for
+# PRECISION the truth is dilated (is this red pixel near a true line?), for
+# RECALL the prediction is dilated (is this true pixel near a red one?).
+# The band drawn here is the precision side, which is the visible one.
+J_TRUTH, J_PRED, J_BAND = "#000000", "#C00000", "#D9D9D9"
+J_TRUTH_RGB = (0.000, 0.000, 0.000)
+J_PRED_RGB = (0.753, 0.000, 0.000)
+J_BAND_RGB = (0.851, 0.851, 0.851)
 J_CMAP = "Blues"                     # white = P 0, dark blue = P 1
 J_GRID = "#9a9a9a"
 
@@ -599,35 +605,29 @@ def fig_probability_panels(ladder=LADDER, taus=(0, 1, 3)):
     thr = float(ck["threshold"])
     _ch, Yt, p = pick_case(net)
     truth = Yt > 0.5
-    d_true = (distance_transform_edt(~truth) if truth.any()
-              else np.full(truth.shape, np.inf))
+    d_true = distance_transform_edt(~truth)
 
-    # real gate voltages, so the panels carry axes rather than pixel indices
     ux, uy, _Z = ray_peaks.load_grid(PICK)
     ext = [ux.min(), ux.max(), uy.min(), uy.max()]
 
-    def err_rgb(pred, tau):
-        """black = found within tau, red = missed line, blue = false line."""
-        dp = (distance_transform_edt(~pred) if pred.any()
-              else np.full(pred.shape, np.inf))
+    def overlay(pred, tau):
+        """grey band (truth +/- tau), then the red output, then black truth."""
         rgb = np.ones(truth.shape + (3,))
-        rgb[pred & (d_true > tau)] = J_FALSE_RGB
-        rgb[truth & (dp > tau)] = J_MISS_RGB
-        rgb[pred & (d_true <= tau)] = J_HIT_RGB
+        rgb[d_true <= tau] = J_BAND_RGB
+        rgb[pred] = J_PRED_RGB
+        rgb[truth] = J_TRUTH_RGB
         return rgb
 
-    def axes_style(ax, ylab=True):
+    def axes_style(ax):
         ax.set_xlabel("$V_1$ (mV)", fontsize=9, color=INK, labelpad=2)
-        ax.set_ylabel("$V_2$ (mV)" if ylab else "", fontsize=9, color=INK,
-                      labelpad=2)
+        ax.set_ylabel("$V_2$ (mV)", fontsize=9, color=INK, labelpad=2)
         ax.tick_params(labelsize=7.5, length=3, width=0.7, direction="out",
                        colors=INK)
         ax.set_xticks(np.round(np.linspace(ext[0], ext[1], 5), 2))
         ax.set_yticks(np.round(np.linspace(ext[2], ext[3], 5), 2))
-        # the grid sits ON TOP of the image, so it has to be thin and light
-        ax.grid(True, which="major", color=J_GRID, linewidth=0.5,
-                linestyle=(0, (1, 3)), alpha=0.85)
-        ax.set_axisbelow(False)
+        ax.grid(True, color=J_GRID, linewidth=0.5, linestyle=(0, (1, 3)),
+                alpha=0.85)
+        ax.set_axisbelow(False)           # the grid sits ON TOP of the image
         for sp in ax.spines.values():
             sp.set_color("#444444")
             sp.set_linewidth(0.8)
@@ -640,13 +640,18 @@ def fig_probability_panels(ladder=LADDER, taus=(0, 1, 3)):
         axes_style(ax)
         if boxed:
             for sp in ax.spines.values():
-                sp.set_color(boxed); sp.set_linewidth(2.2)
+                sp.set_color(boxed)
+                sp.set_linewidth(2.2)
         if cbar:
             cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
             cb.ax.tick_params(labelsize=7.5)
             cb.outline.set_linewidth(0.6)
         fig.tight_layout()
         save(fig, name)
+
+    def show(ax, rgb):
+        return ax.imshow(rgb, origin="lower", extent=ext, aspect="auto",
+                         interpolation="nearest")
 
     # 1 — the raw probability map
     panel("p2l_1_probability",
@@ -655,78 +660,114 @@ def fig_probability_panels(ladder=LADDER, taus=(0, 1, 3)):
                                interpolation="nearest"),
           "U-Net output\n$P$(transition line)", cbar=True)
 
-    # 2, 3 — the same map cut at two thresholds, scored at tau = 1
+    # 2, 3 — the same map cut at two thresholds, both scored at tau = 1
     for k, t in enumerate(ladder):
-        pred = p > t
-        f1 = tolerant_f1(pred, Yt, 1.0)["f1"]
+        pred_t = p > t
+        m = tolerant_f1(pred_t, Yt, 1.0)
         chosen = abs(t - thr) < 1e-9
         panel(f"p2l_{2 + k}_threshold_{t:g}".replace(".", "p"),
-              lambda ax, pr=pred: ax.imshow(err_rgb(pr, 1.0), origin="lower",
-                                            extent=ext, aspect="auto",
-                                            interpolation="nearest"),
+              lambda ax, pr=pred_t: show(ax, overlay(pr, 1.0)),
               f"$P$ > {t:g}" + ("  (chosen)" if chosen else "") +
-              f"\nF1@1 = {f1:.3f}",
-              colour=J_MISS if chosen else INK,
-              boxed=J_MISS if chosen else None)
+              f"\nF1@1 = {m['f1']:.3f}",
+              colour=J_PRED if chosen else INK,
+              boxed=J_PRED if chosen else None)
 
-    # 4, 5, 6 — ONE prediction (the chosen cut), scored at three tolerances
+    # 4, 5, 6 — ONE prediction, three tolerances: only the band changes
     pred = p > thr
     for k, tau in enumerate(taus):
-        f1 = tolerant_f1(pred, Yt, float(tau))["f1"]
-        head = "τ = 0  (strict)" if tau == 0 else f"τ = {tau}"
+        m = tolerant_f1(pred, Yt, float(tau))
+        head = "tau = 0  (no band)" if tau == 0 else f"tau = {tau}"
+        head = head.replace("tau", "τ")
         panel(f"p2l_{4 + k}_tau{tau}",
-              lambda ax, tt=tau: ax.imshow(err_rgb(pred, float(tt)),
-                                           origin="lower", extent=ext,
-                                           aspect="auto",
-                                           interpolation="nearest"),
-              f"{head}\nF1@{tau} = {f1:.3f}",
-              colour=J_FALSE if tau == 1 else INK,
-              boxed=J_FALSE if tau == 1 else None)
+              lambda ax, tt=tau: show(ax, overlay(pred, float(tt))),
+              f"{head}\nF1@{tau} = {m['f1']:.3f}",
+              colour=J_PRED if tau == 1 else INK,
+              boxed=J_PRED if tau == 1 else None)
 
-    # 7 — why tau = 1: the tolerance curve on the 50 held-out devices
+    # 7 — the tolerance curve: F1, and the precision / recall behind it
     with open(os.path.join(RUN_DIR, "comparison.csv"), newline="") as fh:
         row = next(r for r in csv.DictReader(fh)
                    if r["configuration"] == CONFIG)
-    f1s = [float(row[f"f1@{t}"]) for t in (0, 1, 2, 3)]
+    T = (0, 1, 2, 3)
+    f1s = [float(row[f"f1@{t}"]) for t in T]
+    prs = [float(row[f"precision@{t}"]) for t in T]
+    rcs = [float(row[f"recall@{t}"]) for t in T]
+
     fig, ax = plt.subplots(figsize=(3.35, 2.85))
-    ax.plot([0, 1, 2, 3], f1s, "-o", color=J_HIT, linewidth=1.6,
-            markersize=5, zorder=3)
-    ax.plot([1], [f1s[1]], "o", color=J_FALSE, markersize=12,
+    ax.plot(T, prs, "--s", color="#777777", linewidth=1.0, markersize=3.6,
+            label="precision", zorder=2)
+    ax.plot(T, rcs, ":^", color="#777777", linewidth=1.0, markersize=3.8,
+            label="recall", zorder=2)
+    ax.plot(T, f1s, "-o", color=J_TRUTH, linewidth=1.8, markersize=5,
+            label="F1", zorder=3)
+    ax.plot([1], [f1s[1]], "o", color=J_PRED, markersize=12,
             markerfacecolor="none", markeredgewidth=1.8, zorder=4)
-    for x, y in zip((0, 1, 2, 3), f1s):
-        off, ha = ((13, -4), "left") if x == 0 else ((0, -16), "center")
+    for x, y in zip(T, f1s):
+        off, ha = {0: ((13, -4), "left"),
+                   1: ((0, 16), "center")}.get(x, ((0, -16), "center"))
         ax.annotate(f"{y:.3f}", (x, y), textcoords="offset points",
                     xytext=off, ha=ha, fontsize=8.5,
-                    color=J_FALSE if x == 1 else INK)
-    ax.set_xticks([0, 1, 2, 3])
+                    color=J_PRED if x == 1 else INK)
+    ax.set_xticks(list(T))
     ax.set_ylim(0.30, 1.02)
     ax.set_xlabel("tolerance τ  (pixels)", fontsize=9.5, color=INK)
-    ax.set_ylabel("F1 on 50 held-out devices", fontsize=9.5, color=INK)
-    ax.set_title("τ = 0 → 1 is the big jump;\nbeyond that the curve "
-                 "flattens", fontsize=10, color=INK, pad=6)
+    ax.set_ylabel("score on 50 held-out devices", fontsize=9.5, color=INK)
+    ax.set_title("τ = 0 → 1 is the big jump;\nbeyond that the "
+                 "curve flattens", fontsize=10, color=INK, pad=6)
     ax.tick_params(labelsize=8.5, colors=INK)
     ax.grid(True, color=J_GRID, linewidth=0.5, linestyle=(0, (1, 3)),
             alpha=0.85)
     ax.set_axisbelow(True)
+    ax.legend(fontsize=7.5, frameon=False, loc="lower right",
+              handlelength=2.2, borderpad=0.2, labelspacing=0.25)
     for sp in ("top", "right"):
         ax.spines[sp].set_visible(False)
     for sp in ("left", "bottom"):
-        ax.spines[sp].set_color("#444444"); ax.spines[sp].set_linewidth(0.8)
+        ax.spines[sp].set_color("#444444")
+        ax.spines[sp].set_linewidth(0.8)
     fig.tight_layout()
     save(fig, "p2l_7_tolerance_curve")
 
-    # 8 — the colour key on its own
+    # 8 — the colour key
     fig, ax = plt.subplots(figsize=(9.0, 0.40))
     ax.axis("off")
-    for x, txt, col in (
-            (0.000, "found — a line that really is there", J_HIT),
-            (0.365, "missed — a real line not drawn", J_MISS),
-            (0.705, "false — a line where there is none", J_FALSE)):
-        ax.add_patch(plt.Rectangle((x, 0.34), 0.013, 0.34, color=col,
+    KEY = ((0.000, "ground truth — the real transition line",
+            J_TRUTH, J_TRUTH),
+           (0.360, "model output — after the P > 0.4 cut",
+            J_PRED, J_PRED),
+           (0.700, "τ band — within τ pixels of the truth",
+            "#D9D9D9", INK))
+    for x, txt, swatch, tcol in KEY:
+        ax.add_patch(plt.Rectangle((x, 0.34), 0.013, 0.34, facecolor=swatch,
+                                   edgecolor="#888888", linewidth=0.6,
                                    transform=ax.transAxes, clip_on=False))
-        ax.text(x + 0.021, 0.5, txt, transform=ax.transAxes, va="center",
-                fontsize=10.5, color=col, fontweight="bold")
+        ax.text(x + 0.020, 0.5, txt, transform=ax.transAxes, va="center",
+                fontsize=9.0, color=tcol, fontweight="bold")
     save(fig, "p2l_8_legend")
 
-    print(f"  threshold {thr:g}   F1@tau on test: "
-          + ", ".join(f"{t}:{v:.3f}" for t, v in zip((0, 1, 2, 3), f1s)))
+    # 9 — the point of the whole slide, zoomed until pixels are visible:
+    #     the band grows with tau, the black and the red never move
+    r0, c0, S = 30, 26, 40
+    fig, axes = plt.subplots(1, 4, figsize=(9.0, 2.55))
+    for ax, tau in zip(axes, (0, 1, 2, 3)):
+        ax.imshow(overlay(pred, float(tau))[r0:r0 + S, c0:c0 + S],
+                  origin="lower", interpolation="nearest")
+        m = tolerant_f1(pred, Yt, float(tau))
+        ax.set_title(f"τ = {tau}\nP {m['precision']:.2f}   "
+                     f"R {m['recall']:.2f}   F1 {m['f1']:.2f}",
+                     fontsize=11, color=J_PRED if tau == 1 else INK,
+                     fontweight="bold" if tau == 1 else "normal", pad=5)
+        ax.set_xticks([]); ax.set_yticks([])
+        for sp in ax.spines.values():
+            sp.set_color(J_PRED if tau == 1 else "#777777")
+            sp.set_linewidth(1.8 if tau == 1 else 0.8)
+    fig.suptitle("Same truth, same output — only the tolerance band grows",
+                 fontsize=14, color=INK, y=1.03)
+    fig.tight_layout()
+    save(fig, "p2l_9_tau_zoom")
+
+    print(f"  threshold {thr:g}")
+    print("  tau:        " + "  ".join(f"{t}" for t in T))
+    print("  F1:         " + "  ".join(f"{v:.3f}" for v in f1s))
+    print("  precision:  " + "  ".join(f"{v:.3f}" for v in prs))
+    print("  recall:     " + "  ".join(f"{v:.3f}" for v in rcs))
